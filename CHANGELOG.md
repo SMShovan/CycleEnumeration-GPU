@@ -18,8 +18,13 @@ intended to preserve enough technical context for a later project report.
   implementations.
 - Documented that the project is single-node only and will compare final
   performance against the TBB-based baseline paper implementation.
+- Added a target-based CMake skeleton with centralized build options for tests,
+  benchmarks, OpenMP, CUDA, Doxygen, and sanitizers.
+- Added a small core library target with version helpers so future CLI and
+  benchmark output can record the exact project build version.
 
 ### Notes
 
-- No implementation code has been added yet. This foundation step keeps the
-  public repository clean before CMake, tests, and algorithms are introduced.
+- No cycle enumeration algorithm code has been added yet. These foundation
+  steps keep the public repository clean before graph parsing, tests, and
+  algorithm implementations are introduced.
