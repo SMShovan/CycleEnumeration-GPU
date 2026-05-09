@@ -89,6 +89,10 @@ intended to preserve enough technical context for a later project report.
   pruning records timestamp thresholds for vertices that cannot temporally
   reach the root inside a fixed start window, and exposes lightweight counters
   so tests and benchmark reports can show when pruning occurs.
+- Added timestamp path bundling to sequential temporal Johnson. The search now
+  carries `(arrival timestamp, multiplicity)` bundles per vertex path, reducing
+  recursive branching over timestamp assignments while preserving duplicate
+  event multiplicity.
 
 ### Notes
 

@@ -32,3 +32,25 @@ restrictions, then no simple temporal cycle can be completed from that state.
 The current implementation resets closing-time state for each start edge event.
 That keeps window-specific pruning exact and leaves room for later path
 bundling or shared preprocessing when profiling shows it is worthwhile.
+
+## Path Bundling
+
+The temporal Johnson search now walks vertex paths while carrying a bundle of
+arrival timestamps for the current vertex. Each bundle entry stores:
+
+```text
+(arrival_timestamp, multiplicity)
+```
+
+When the search extends a vertex path through an edge, all compatible edge
+timestamps are grouped by timestamp value and their multiplicities are summed.
+Future reachability depends only on the latest timestamp, so assignments that
+arrive at the same vertex with the same timestamp can be counted together.
+
+This preserves duplicate timestamp multiplicity. If an input edge contains two
+events with the same timestamp, both events contribute to the multiplicity even
+though the bundled state stores one timestamp key.
+
+The optimization is intentionally local to a single DFS path. It reduces
+recursive branching over timestamp assignments without changing the vertex-path
+duplicate rules or the histogram contract.

@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(cycle_enum_core_test
   integration/johnson_static_test.cpp
   integration/johnson_time_window_test.cpp
+  integration/path_bundling_test.cpp
   integration/cli_sequential_test.cpp
   integration/read_tarjan_static_test.cpp
   integration/read_tarjan_time_window_test.cpp

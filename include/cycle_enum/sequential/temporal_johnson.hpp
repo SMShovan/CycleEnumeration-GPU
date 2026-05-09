@@ -22,6 +22,7 @@ namespace cycle_enum::sequential {
 struct TemporalJohnsonStats {
   std::uint64_t dfs_states = 0; ///< Number of timestamped DFS states entered.
   std::uint64_t closing_time_prunes = 0; ///< States skipped by closing times.
+  std::uint64_t bundled_arrival_timestamps = 0; ///< Arrival timestamps bundled.
 };
 
 /**

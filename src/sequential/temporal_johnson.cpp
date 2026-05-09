@@ -3,6 +3,7 @@
 #include "cycle_enum/core/timestamp.hpp"
 
 #include <limits>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -33,6 +34,32 @@ void validate_max_cycle_length(
   }
 }
 
+using Count = CycleHistogram::Count;
+
+struct TimestampCount {
+  Timestamp timestamp = 0;
+  Count count = 0;
+};
+
+using TimestampBundle = std::vector<TimestampCount>;
+
+void add_count(Count& target, const Count value) {
+  if (value > std::numeric_limits<Count>::max() - target) {
+    throw std::overflow_error("temporal path count overflow");
+  }
+  target += value;
+}
+
+Count multiply_count(const Count count, const std::size_t multiplier) {
+  if (count == 0 || multiplier == 0) {
+    return 0;
+  }
+  if (multiplier > std::numeric_limits<Count>::max() / count) {
+    throw std::overflow_error("temporal path count overflow");
+  }
+  return count * static_cast<Count>(multiplier);
+}
+
 class TemporalJohnsonSearch {
  public:
   TemporalJohnsonSearch(const GraphView& graph,
@@ -55,9 +82,14 @@ class TemporalJohnsonSearch {
 
       for (std::size_t offset = begin; offset < end; ++offset) {
         const AdjacencyEntry& edge = graph_.outgoing_edges()[offset];
+        std::map<Timestamp, Count> start_counts;
         for (std::size_t timestamp_offset = edge.timestamp_begin;
              timestamp_offset < edge.timestamp_end; ++timestamp_offset) {
-          start(edge.vertex, graph_.timestamps()[timestamp_offset]);
+          add_count(start_counts[graph_.timestamps()[timestamp_offset]], 1);
+        }
+
+        for (const auto& [timestamp, count] : start_counts) {
+          start(edge.vertex, timestamp, count);
         }
       }
     }
@@ -65,7 +97,9 @@ class TemporalJohnsonSearch {
   }
 
  private:
-  void start(const VertexId first_vertex, const Timestamp start_timestamp) {
+  void start(const VertexId first_vertex,
+             const Timestamp start_timestamp,
+             const Count start_count) {
     window_end_ = checked_window_end(start_timestamp, window_width_);
     closing_after_.assign(graph_.vertex_count(), std::nullopt);
     std::fill(visited_.begin(), visited_.end(), 0);
@@ -75,7 +109,7 @@ class TemporalJohnsonSearch {
     visited_[root_] = 1;
     visited_[first_vertex] = 1;
 
-    dfs(first_vertex, start_timestamp);
+    dfs(first_vertex, TimestampBundle{{start_timestamp, start_count}});
   }
 
   bool can_reach_root(const VertexId current,
@@ -115,10 +149,50 @@ class TemporalJohnsonSearch {
     return false;
   }
 
-  bool dfs(const VertexId current, const Timestamp previous_timestamp) {
-    ++stats_.dfs_states;
+  TimestampBundle extend_bundle(const TimestampBundle& arrivals,
+                                const AdjacencyEntry& edge) const {
+    std::map<Timestamp, Count> next_counts;
+    for (const TimestampCount& arrival : arrivals) {
+      const TimestampRange range =
+          timestamps_after(graph_.timestamps(), edge.timestamp_begin,
+                           edge.timestamp_end, arrival.timestamp, window_end_);
+      for (std::size_t timestamp_offset = range.begin;
+           timestamp_offset < range.end; ++timestamp_offset) {
+        add_count(next_counts[graph_.timestamps()[timestamp_offset]],
+                  arrival.count);
+      }
+    }
 
-    if (!can_reach_root(current, previous_timestamp)) {
+    TimestampBundle bundle;
+    bundle.reserve(next_counts.size());
+    for (const auto& [timestamp, count] : next_counts) {
+      bundle.push_back(TimestampCount{timestamp, count});
+    }
+    return bundle;
+  }
+
+  Count closing_count(const TimestampBundle& arrivals,
+                      const AdjacencyEntry& edge) const {
+    Count total = 0;
+    for (const TimestampCount& arrival : arrivals) {
+      const TimestampRange range =
+          timestamps_after(graph_.timestamps(), edge.timestamp_begin,
+                           edge.timestamp_end, arrival.timestamp, window_end_);
+      add_count(total, multiply_count(arrival.count, range.size()));
+    }
+    return total;
+  }
+
+  bool dfs(const VertexId current, const TimestampBundle& arrivals) {
+    ++stats_.dfs_states;
+    stats_.bundled_arrival_timestamps += arrivals.size();
+
+    if (arrivals.empty()) {
+      return false;
+    }
+
+    const Timestamp earliest_arrival = arrivals.front().timestamp;
+    if (!can_reach_root(current, earliest_arrival)) {
       ++stats_.closing_time_prunes;
       return false;
     }
@@ -129,17 +203,14 @@ class TemporalJohnsonSearch {
 
     for (std::size_t offset = begin; offset < end; ++offset) {
       const AdjacencyEntry& edge = graph_.outgoing_edges()[offset];
-      const TimestampRange range =
-          timestamps_after(graph_.timestamps(), edge.timestamp_begin,
-                           edge.timestamp_end, previous_timestamp, window_end_);
-      if (range.empty()) {
-        continue;
-      }
-
       const VertexId next = edge.vertex;
       if (next == root_ && path_.size() >= 2) {
+        const Count count = closing_count(arrivals, edge);
+        if (count == 0) {
+          continue;
+        }
         histogram_.increment(static_cast<CycleHistogram::Length>(path_.size()),
-                             static_cast<CycleHistogram::Count>(range.size()));
+                             count);
         found_cycle = true;
         continue;
       }
@@ -153,13 +224,14 @@ class TemporalJohnsonSearch {
         continue;
       }
 
+      const TimestampBundle next_arrivals = extend_bundle(arrivals, edge);
+      if (next_arrivals.empty()) {
+        continue;
+      }
+
       visited_[next] = 1;
       path_.push_back(next);
-      for (std::size_t timestamp_offset = range.begin;
-           timestamp_offset < range.end; ++timestamp_offset) {
-        found_cycle =
-            dfs(next, graph_.timestamps()[timestamp_offset]) || found_cycle;
-      }
+      found_cycle = dfs(next, next_arrivals) || found_cycle;
       path_.pop_back();
       visited_[next] = 0;
     }
