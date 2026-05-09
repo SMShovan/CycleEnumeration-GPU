@@ -84,6 +84,7 @@ add_library(cycle_enum_openmp
   src/openmp/openmp_johnson.cpp
   src/openmp/openmp_read_tarjan.cpp
   src/openmp/openmp_temporal_johnson.cpp
+  src/openmp/openmp_temporal_read_tarjan.cpp
 )
 
 add_library(cycle_enum::openmp ALIAS cycle_enum_openmp)

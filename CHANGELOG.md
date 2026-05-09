@@ -122,6 +122,10 @@ intended to preserve enough technical context for a later project report.
   bundles private to each worker. The merged instrumentation mirrors the
   sequential temporal Johnson counters so CPU backend behavior can be compared
   in later benchmark reports.
+- Added an OpenMP temporal Read-Tarjan baseline. It keeps the sequential
+  timestamp-by-timestamp expansion semantics, adds thread-local instrumentation
+  for DFS states, closing-time prunes, and timestamp extensions, and merges
+  histograms after the root-parallel search.
 
 ### Notes
 
