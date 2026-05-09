@@ -21,6 +21,7 @@ add_executable(cycle_enum_core_test
   integration/read_tarjan_static_test.cpp
   integration/read_tarjan_time_window_test.cpp
   integration/temporal_johnson_test.cpp
+  integration/temporal_read_tarjan_test.cpp
   unit/bruteforce_test.cpp
   unit/graph_parser_test.cpp
   unit/graph_view_test.cpp

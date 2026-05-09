@@ -52,6 +52,7 @@ add_library(cycle_enum_sequential
   src/sequential/johnson.cpp
   src/sequential/read_tarjan.cpp
   src/sequential/temporal_johnson.cpp
+  src/sequential/temporal_read_tarjan.cpp
 )
 
 add_library(cycle_enum::sequential ALIAS cycle_enum_sequential)

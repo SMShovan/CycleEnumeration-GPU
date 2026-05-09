@@ -93,6 +93,10 @@ intended to preserve enough technical context for a later project report.
   carries `(arrival timestamp, multiplicity)` bundles per vertex path, reducing
   recursive branching over timestamp assignments while preserving duplicate
   event multiplicity.
+- Added the sequential temporal Read-Tarjan baseline. It uses independent
+  start-edge timestamp work items with local visited/path state, conservative
+  temporal reachability pruning, and parity tests against both the temporal
+  brute-force oracle and temporal Johnson.
 
 ### Notes
 
