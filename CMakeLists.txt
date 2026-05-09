@@ -13,6 +13,8 @@ include(cmake/Sanitizers.cmake)
 include(cmake/Doxygen.cmake)
 
 add_library(cycle_enum_core
+  src/core/options.cpp
+  src/core/result.cpp
   src/core/version.cpp
 )
 

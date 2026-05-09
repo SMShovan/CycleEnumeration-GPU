@@ -28,6 +28,12 @@ intended to preserve enough technical context for a later project report.
 - Added optional Doxygen wiring and a project Doxyfile template. Public headers
   can now grow API documentation as the graph, CPU, OpenMP, and CUDA modules
   are implemented.
+- Added shared option and result types for selecting cycle semantics,
+  algorithm family, execution backend, validation behavior, and runtime
+  reporting. These types give the later sequential, OpenMP, and CUDA paths a
+  common interface.
+- Added unit tests for option defaults, option validation, status names, and
+  runtime-statistic defaults.
 
 ### Notes
 

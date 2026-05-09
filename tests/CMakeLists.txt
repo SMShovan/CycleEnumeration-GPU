@@ -13,16 +13,17 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(googletest)
 
-add_executable(cycle_enum_smoke_test
+add_executable(cycle_enum_core_test
+  unit/options_test.cpp
+  unit/result_test.cpp
   unit/smoke_test.cpp
 )
 
-target_link_libraries(cycle_enum_smoke_test
+target_link_libraries(cycle_enum_core_test
   PRIVATE
     cycle_enum::core
     GTest::gtest_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(cycle_enum_smoke_test)
-
+gtest_discover_tests(cycle_enum_core_test)
