@@ -156,6 +156,11 @@ intended to preserve enough technical context for a later project report.
   primitives mirror the CPU inclusive-window, strict-after-start, and temporal
   strictly-increasing timestamp semantics that future GPU time-window and
   temporal kernels will need.
+- Added a naive CUDA Johnson simple-time-window counter. The kernel launches
+  one thread per start-edge timestamp, performs bounded DFS with per-thread
+  stacks, and uses device timestamp binary search to match the CPU
+  inclusive/strict baseline boundary convention before later load-balancing
+  and aggregation optimizations.
 
 ### Notes
 

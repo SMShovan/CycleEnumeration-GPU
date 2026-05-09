@@ -283,7 +283,10 @@ def project_cases(args: argparse.Namespace) -> Iterable[BenchmarkCase]:
                             file=sys.stderr,
                         )
                         continue
-                    if backend == "cuda" and (algorithm != "johnson" or mode != "simple"):
+                    if backend == "cuda" and (
+                        algorithm != "johnson"
+                        or mode not in ("simple", "simple-time-window")
+                    ):
                         print(
                             "Skipping unsupported CUDA case "
                             f"algorithm={algorithm} mode={mode}",

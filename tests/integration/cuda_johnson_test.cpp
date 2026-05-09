@@ -42,6 +42,12 @@ TEST(CudaJohnsonTest, RejectsInvalidMaximumLength) {
   EXPECT_THROW(
       (void)cycle_enum::cuda::count_simple_cycles_johnson(view, 0, 1),
       std::invalid_argument);
+  EXPECT_THROW((void)cycle_enum::cuda::count_time_window_cycles_johnson(
+                   view, 0, 3600, 1),
+               std::invalid_argument);
+  EXPECT_THROW((void)cycle_enum::cuda::count_time_window_cycles_johnson(
+                   view, 0, -1, 4),
+               std::invalid_argument);
 }
 
 TEST(CudaJohnsonTest, RequiresCompiledCudaBackend) {
@@ -63,4 +69,34 @@ TEST(CudaJohnsonTest, RequiresCompiledCudaBackend) {
 
   EXPECT_EQ(cycle_enum::cuda::count_simple_cycles_johnson(view, 0, 4),
             cycle_enum::sequential::count_simple_cycles_johnson(view, 4));
+}
+
+TEST(CudaJohnsonTest, TimeWindowMatchesSequentialWhenAvailable) {
+  const cycle_enum::GraphView view = view_from_edges(
+      {
+          {0, 1, {0}},
+          {1, 2, {2}},
+          {2, 0, {3}},
+          {1, 3, {2}},
+          {3, 0, {3}},
+      },
+      4);
+
+  if (!cycle_enum::cuda::compiled_with_cuda()) {
+    EXPECT_THROW((void)cycle_enum::cuda::count_time_window_cycles_johnson(
+                     view, 0, 3600, 4),
+                 std::runtime_error);
+    GTEST_SKIP() << "CUDA support is not compiled in this build";
+  }
+
+  if (cycle_enum::cuda::device_count() == 0) {
+    EXPECT_THROW((void)cycle_enum::cuda::count_time_window_cycles_johnson(
+                     view, 0, 3600, 4),
+                 std::out_of_range);
+    GTEST_SKIP() << "No CUDA device is visible in this build";
+  }
+
+  EXPECT_EQ(cycle_enum::cuda::count_time_window_cycles_johnson(view, 0, 3600, 4),
+            cycle_enum::sequential::count_time_window_cycles_johnson(view, 3600,
+                                                                     4));
 }

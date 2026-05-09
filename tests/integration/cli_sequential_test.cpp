@@ -262,4 +262,33 @@ TEST(CliCudaTest, ReportsUnavailableBackendWhenNotCompiled) {
   EXPECT_NE(output.find("CUDA support is not compiled"), std::string::npos);
 }
 
+TEST(CliCudaTest, TimeWindowReportsUnavailableBackendWhenNotCompiled) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "cuda",
+          "--cuda-device",
+          "0",
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "simple-time-window",
+          "--time-window",
+          "3600",
+          "--max-cycle-length",
+          "5",
+      },
+      status);
+
+  if (output.find("CUDA support is not compiled") == std::string::npos) {
+    GTEST_SKIP() << "CUDA support is compiled in this test build";
+  }
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("CUDA support is not compiled"), std::string::npos);
+}
+
 }  // namespace

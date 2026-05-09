@@ -137,8 +137,9 @@ template <typename Integer>
     if (options.algorithm != cycle_enum::AlgorithmFamily::Johnson) {
       errors.emplace_back("cuda backend currently supports only johnson");
     }
-    if (options.mode != cycle_enum::CycleMode::Simple) {
-      errors.emplace_back("cuda backend currently supports only simple mode");
+    if (options.mode == cycle_enum::CycleMode::Temporal) {
+      errors.emplace_back(
+          "cuda backend currently supports simple and simple-time-window modes");
     }
     if (!options.max_cycle_length.has_value()) {
       errors.emplace_back(
@@ -415,6 +416,13 @@ template <typename Integer>
       options.max_cycle_length.has_value()) {
     return cycle_enum::cuda::count_simple_cycles_johnson(
         graph, options.cuda_device_id, *options.max_cycle_length);
+  }
+  if (options.mode == cycle_enum::CycleMode::SimpleTimeWindow &&
+      options.algorithm == cycle_enum::AlgorithmFamily::Johnson &&
+      options.max_cycle_length.has_value()) {
+    return cycle_enum::cuda::count_time_window_cycles_johnson(
+        graph, options.cuda_device_id, *options.time_window,
+        *options.max_cycle_length);
   }
 
   throw std::logic_error("unsupported CUDA cycle counting mode");

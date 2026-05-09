@@ -28,10 +28,10 @@ focused on CPU threading and one-GPU execution.
 
 The repository has the foundation, temporal graph parser, CSR/CSC graph view,
 histogram utilities, timestamp helpers, exact sequential counters, OpenMP CPU
-baselines, and the first bounded CUDA Johnson baseline. The `cycle-enum`
+baselines, and bounded CUDA Johnson baselines. The `cycle-enum`
 command-line driver can run sequential and OpenMP static/temporal Johnson and
-Read-Tarjan counters, and can dispatch the current CUDA static Johnson backend
-when built on an NVIDIA CUDA system.
+Read-Tarjan counters, and can dispatch the current CUDA static and simple
+time-window Johnson backends when built on an NVIDIA CUDA system.
 
 CUDA runtime detection is wired into the build as an optional target. On
 non-CUDA machines it compiles as an unavailable backend; on NVIDIA systems,
