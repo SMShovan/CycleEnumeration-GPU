@@ -46,7 +46,9 @@ class GraphParseError : public std::runtime_error {
  * @brief Compact temporal graph produced by the parser.
  *
  * The graph owns external-to-compact vertex mapping data and grouped temporal
- * edges. CSR and CSC views are built from this representation in a later phase.
+ * edges. Compact ids preserve ascending external-id order, which keeps
+ * duplicate-avoidance comparisons stable after parsing. CSR and CSC views are
+ * built from this representation in a later phase.
  */
 class TemporalGraph {
  public:
@@ -111,7 +113,9 @@ class TemporalGraph {
  *
  * Lines beginning with `#` or `%`, after optional leading whitespace, are
  * ignored. Blank lines are ignored. Self-loops are skipped. Remaining rows must
- * contain exactly three signed integer fields.
+ * contain exactly three signed integer fields. Compact vertex ids are assigned
+ * in ascending order of the external vertex ids that survive self-loop
+ * filtering.
  *
  * @throws GraphParseError if the file cannot be opened or a row is malformed.
  */

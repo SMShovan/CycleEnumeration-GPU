@@ -51,6 +51,31 @@ TEST(GraphParserTest, SkipsSelfLoopsWithoutInterningLoopOnlyVertex) {
   EXPECT_FALSE(graph.compact_id(40).has_value());
 }
 
+TEST(GraphParserTest, AssignsCompactIdsInAscendingExternalOrder) {
+  const std::filesystem::path path =
+      std::filesystem::temp_directory_path() / "cycle_enum_unsorted_ids.txt";
+  {
+    std::ofstream output(path);
+    output << "50 10 1\n";
+    output << "10 30 2\n";
+  }
+
+  const cycle_enum::TemporalGraph graph =
+      cycle_enum::read_temporal_graph(path);
+
+  ASSERT_TRUE(graph.compact_id(10).has_value());
+  ASSERT_TRUE(graph.compact_id(30).has_value());
+  ASSERT_TRUE(graph.compact_id(50).has_value());
+  EXPECT_EQ(*graph.compact_id(10), 0U);
+  EXPECT_EQ(*graph.compact_id(30), 1U);
+  EXPECT_EQ(*graph.compact_id(50), 2U);
+  EXPECT_EQ(graph.external_id(0), 10);
+  EXPECT_EQ(graph.external_id(1), 30);
+  EXPECT_EQ(graph.external_id(2), 50);
+
+  std::filesystem::remove(path);
+}
+
 TEST(GraphParserTest, ThrowsForMissingFile) {
   EXPECT_THROW(
       {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 
@@ -26,20 +27,11 @@ std::string line_error(const std::filesystem::path& path,
   return message.str();
 }
 
-VertexId intern_vertex(
-    const ExternalVertexId external,
-    std::unordered_map<ExternalVertexId, VertexId>& compact_ids,
-    std::vector<ExternalVertexId>& external_ids) {
-  const auto existing = compact_ids.find(external);
-  if (existing != compact_ids.end()) {
-    return existing->second;
-  }
-
-  const VertexId compact = static_cast<VertexId>(external_ids.size());
-  compact_ids.emplace(external, compact);
-  external_ids.push_back(external);
-  return compact;
-}
+struct RawTemporalEdge {
+  ExternalVertexId source = 0;
+  ExternalVertexId target = 0;
+  Timestamp timestamp = 0;
+};
 
 }  // namespace
 
@@ -104,9 +96,8 @@ TemporalGraph read_temporal_graph(const std::filesystem::path& path) {
                           path.string());
   }
 
-  std::unordered_map<ExternalVertexId, VertexId> compact_ids;
-  std::vector<ExternalVertexId> external_ids;
-  std::map<std::pair<VertexId, VertexId>, std::vector<Timestamp>> grouped_edges;
+  std::vector<RawTemporalEdge> raw_edges;
+  std::set<ExternalVertexId> external_id_set;
 
   std::string line;
   std::size_t line_number = 0;
@@ -133,11 +124,25 @@ TemporalGraph read_temporal_graph(const std::filesystem::path& path) {
       continue;
     }
 
-    const VertexId source =
-        intern_vertex(source_external, compact_ids, external_ids);
-    const VertexId target =
-        intern_vertex(target_external, compact_ids, external_ids);
-    grouped_edges[{source, target}].push_back(timestamp);
+    raw_edges.push_back(
+        RawTemporalEdge{source_external, target_external, timestamp});
+    external_id_set.insert(source_external);
+    external_id_set.insert(target_external);
+  }
+
+  std::vector<ExternalVertexId> external_ids(external_id_set.begin(),
+                                             external_id_set.end());
+  std::unordered_map<ExternalVertexId, VertexId> compact_ids;
+  compact_ids.reserve(external_ids.size());
+  for (std::size_t index = 0; index < external_ids.size(); ++index) {
+    compact_ids.emplace(external_ids[index], static_cast<VertexId>(index));
+  }
+
+  std::map<std::pair<VertexId, VertexId>, std::vector<Timestamp>> grouped_edges;
+  for (const RawTemporalEdge& raw_edge : raw_edges) {
+    const VertexId source = compact_ids.at(raw_edge.source);
+    const VertexId target = compact_ids.at(raw_edge.target);
+    grouped_edges[{source, target}].push_back(raw_edge.timestamp);
   }
 
   std::vector<TemporalEdge> edges;
@@ -155,4 +160,3 @@ TemporalGraph read_temporal_graph(const std::filesystem::path& path) {
 }
 
 }  // namespace cycle_enum
-
