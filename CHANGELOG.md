@@ -67,6 +67,10 @@ intended to preserve enough technical context for a later project report.
   constrained by start-edge time windows. The timestamp boundary rule follows
   the baseline implementation's vertex-order convention, and the reference
   sample graph now reproduces the expected histogram of five cycles.
+- Added a sequential Read-Tarjan-style static cycle counter based on
+  path-extension search. The implementation is validated against the brute-force
+  oracle on acyclic, single-cycle, overlapping-cycle, and maximum-length
+  fixtures.
 
 ### Notes
 
