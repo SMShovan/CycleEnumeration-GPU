@@ -34,14 +34,30 @@ TimestampRange timestamps_in_window(
     const Timestamp window_start,
     const Timestamp window_width,
     const TimestampStartPolicy start_policy) {
+  return timestamps_in_window(timestamps, 0, timestamps.size(), window_start,
+                              window_width, start_policy);
+}
+
+TimestampRange timestamps_in_window(
+    const std::vector<Timestamp>& timestamps,
+    const std::size_t search_begin,
+    const std::size_t search_end,
+    const Timestamp window_start,
+    const Timestamp window_width,
+    const TimestampStartPolicy start_policy) {
   const Timestamp window_end = checked_window_end(window_start, window_width);
 
+  if (search_begin > search_end || search_end > timestamps.size()) {
+    throw std::out_of_range("timestamp search range is out of bounds");
+  }
+
+  const auto range_begin = timestamps.begin() + static_cast<std::ptrdiff_t>(search_begin);
+  const auto range_end = timestamps.begin() + static_cast<std::ptrdiff_t>(search_end);
   const auto begin_it =
       start_policy == TimestampStartPolicy::Inclusive
-          ? std::lower_bound(timestamps.begin(), timestamps.end(), window_start)
-          : std::upper_bound(timestamps.begin(), timestamps.end(), window_start);
-  const auto end_it =
-      std::upper_bound(begin_it, timestamps.end(), window_end);
+          ? std::lower_bound(range_begin, range_end, window_start)
+          : std::upper_bound(range_begin, range_end, window_start);
+  const auto end_it = std::upper_bound(begin_it, range_end, window_end);
 
   return TimestampRange{
       static_cast<std::size_t>(std::distance(timestamps.begin(), begin_it)),
@@ -58,12 +74,38 @@ bool has_timestamp_in_window(const std::vector<Timestamp>& timestamps,
               .empty();
 }
 
+bool has_timestamp_in_window(const std::vector<Timestamp>& timestamps,
+                             const std::size_t search_begin,
+                             const std::size_t search_end,
+                             const Timestamp window_start,
+                             const Timestamp window_width,
+                             const TimestampStartPolicy start_policy) {
+  return !timestamps_in_window(timestamps, search_begin, search_end,
+                               window_start, window_width, start_policy)
+              .empty();
+}
+
 TimestampRange timestamps_after(const std::vector<Timestamp>& timestamps,
                                 const Timestamp previous_timestamp,
                                 const Timestamp window_end) {
+  return timestamps_after(timestamps, 0, timestamps.size(), previous_timestamp,
+                          window_end);
+}
+
+TimestampRange timestamps_after(const std::vector<Timestamp>& timestamps,
+                                const std::size_t search_begin,
+                                const std::size_t search_end,
+                                const Timestamp previous_timestamp,
+                                const Timestamp window_end) {
+  if (search_begin > search_end || search_end > timestamps.size()) {
+    throw std::out_of_range("timestamp search range is out of bounds");
+  }
+
+  const auto range_begin = timestamps.begin() + static_cast<std::ptrdiff_t>(search_begin);
+  const auto range_end = timestamps.begin() + static_cast<std::ptrdiff_t>(search_end);
   const auto begin_it =
-      std::upper_bound(timestamps.begin(), timestamps.end(), previous_timestamp);
-  const auto end_it = std::upper_bound(begin_it, timestamps.end(), window_end);
+      std::upper_bound(range_begin, range_end, previous_timestamp);
+  const auto end_it = std::upper_bound(begin_it, range_end, window_end);
 
   return TimestampRange{
       static_cast<std::size_t>(std::distance(timestamps.begin(), begin_it)),
@@ -81,4 +123,3 @@ std::optional<Timestamp> first_timestamp(
 }
 
 }  // namespace cycle_enum
-

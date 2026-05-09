@@ -29,5 +29,16 @@ namespace cycle_enum::sequential {
     const GraphView& graph,
     std::optional<std::size_t> max_cycle_length = std::nullopt);
 
-}  // namespace cycle_enum::sequential
+/**
+ * @brief Count simple cycles whose edges fall in a start-edge time window.
+ *
+ * This oracle mirrors the baseline time-window duplicate-avoidance rule: edge
+ * timestamp lookup is inclusive before the root vertex in numeric order and
+ * strict after the root. It is intended for small validation fixtures.
+ */
+[[nodiscard]] CycleHistogram count_time_window_cycles_bruteforce(
+    const GraphView& graph,
+    Timestamp window_width,
+    std::optional<std::size_t> max_cycle_length = std::nullopt);
 
+}  // namespace cycle_enum::sequential

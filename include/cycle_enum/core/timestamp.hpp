@@ -55,10 +55,35 @@ enum class TimestampStartPolicy {
     TimestampStartPolicy start_policy = TimestampStartPolicy::Inclusive);
 
 /**
+ * @brief Find timestamps inside a subrange and inside a time window.
+ *
+ * Returned offsets are relative to the full `timestamps` vector, not relative
+ * to `search_begin`.
+ */
+[[nodiscard]] TimestampRange timestamps_in_window(
+    const std::vector<Timestamp>& timestamps,
+    std::size_t search_begin,
+    std::size_t search_end,
+    Timestamp window_start,
+    Timestamp window_width,
+    TimestampStartPolicy start_policy = TimestampStartPolicy::Inclusive);
+
+/**
  * @brief Return whether a sorted timestamp vector has a value in a window.
  */
 [[nodiscard]] bool has_timestamp_in_window(
     const std::vector<Timestamp>& timestamps,
+    Timestamp window_start,
+    Timestamp window_width,
+    TimestampStartPolicy start_policy = TimestampStartPolicy::Inclusive);
+
+/**
+ * @brief Return whether a timestamp subrange has a value in a window.
+ */
+[[nodiscard]] bool has_timestamp_in_window(
+    const std::vector<Timestamp>& timestamps,
+    std::size_t search_begin,
+    std::size_t search_end,
     Timestamp window_start,
     Timestamp window_width,
     TimestampStartPolicy start_policy = TimestampStartPolicy::Inclusive);
@@ -75,6 +100,16 @@ enum class TimestampStartPolicy {
     Timestamp window_end);
 
 /**
+ * @brief Find temporal timestamps in a subrange and in `(previous, end]`.
+ */
+[[nodiscard]] TimestampRange timestamps_after(
+    const std::vector<Timestamp>& timestamps,
+    std::size_t search_begin,
+    std::size_t search_end,
+    Timestamp previous_timestamp,
+    Timestamp window_end);
+
+/**
  * @brief Return the first timestamp in a range, if the range is not empty.
  */
 [[nodiscard]] std::optional<Timestamp> first_timestamp(
@@ -82,4 +117,3 @@ enum class TimestampStartPolicy {
     TimestampRange range);
 
 }  // namespace cycle_enum
-

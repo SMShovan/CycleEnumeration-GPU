@@ -30,6 +30,16 @@ TEST(TimestampTest, FindsStrictAfterStartWindowRange) {
   EXPECT_EQ(cycle_enum::first_timestamp(timestamps, range), 5);
 }
 
+TEST(TimestampTest, FindsWindowInsideSubrange) {
+  const std::vector<cycle_enum::Timestamp> timestamps{1, 3, 5, 7, 9};
+
+  const cycle_enum::TimestampRange range =
+      cycle_enum::timestamps_in_window(timestamps, 1, 4, 4, 3);
+
+  EXPECT_EQ(range.begin, 2U);
+  EXPECT_EQ(range.end, 4U);
+}
+
 TEST(TimestampTest, ReportsEmptyWindow) {
   const std::vector<cycle_enum::Timestamp> timestamps{10, 20};
 
@@ -46,6 +56,16 @@ TEST(TimestampTest, FindsTemporalStrictlyIncreasingRange) {
   EXPECT_EQ(range.begin, 3U);
   EXPECT_EQ(range.end, 4U);
   EXPECT_EQ(cycle_enum::first_timestamp(timestamps, range), 4);
+}
+
+TEST(TimestampTest, FindsTemporalRangeInsideSubrange) {
+  const std::vector<cycle_enum::Timestamp> timestamps{1, 2, 4, 6, 8};
+
+  const cycle_enum::TimestampRange range =
+      cycle_enum::timestamps_after(timestamps, 1, 4, 2, 6);
+
+  EXPECT_EQ(range.begin, 2U);
+  EXPECT_EQ(range.end, 4U);
 }
 
 TEST(TimestampTest, RejectsInvalidWindowWidth) {
@@ -73,4 +93,3 @@ TEST(TimestampTest, FirstTimestampReturnsEmptyForInvalidRange) {
 }
 
 }  // namespace
-

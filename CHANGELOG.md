@@ -63,6 +63,10 @@ intended to preserve enough technical context for a later project report.
   directed cycle once using the smallest compact vertex as root, and is tested
   against the brute-force oracle on acyclic, single-cycle, and overlapping-cycle
   fixtures.
+- Added sequential Johnson and brute-force oracle support for simple cycles
+  constrained by start-edge time windows. The timestamp boundary rule follows
+  the baseline implementation's vertex-order convention, and the reference
+  sample graph now reproduces the expected histogram of five cycles.
 
 ### Notes
 
