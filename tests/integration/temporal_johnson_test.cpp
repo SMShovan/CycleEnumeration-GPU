@@ -101,6 +101,26 @@ TEST(TemporalJohnsonTest, HonorsTimeWindowAndMaximumLength) {
             0U);
 }
 
+TEST(TemporalJohnsonTest, ReportsClosingTimePrunes) {
+  const cycle_enum::GraphView view = view_from_edges(
+      {
+          {0, 1, {1}},
+          {1, 0, {4}},
+          {1, 2, {2, 3}},
+      },
+      3);
+
+  const cycle_enum::sequential::TemporalJohnsonResult result =
+      cycle_enum::sequential::count_temporal_cycles_johnson_with_stats(view,
+                                                                       10);
+
+  EXPECT_EQ(result.histogram,
+            cycle_enum::sequential::count_temporal_cycles_bruteforce(view, 10));
+  EXPECT_EQ(result.histogram.count(2), 1U);
+  EXPECT_GT(result.stats.dfs_states, 0U);
+  EXPECT_GT(result.stats.closing_time_prunes, 0U);
+}
+
 TEST(TemporalJohnsonTest, RejectsInvalidConfiguration) {
   const cycle_enum::GraphView view = view_from_edges({}, 0);
 

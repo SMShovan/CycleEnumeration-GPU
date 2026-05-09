@@ -85,6 +85,10 @@ intended to preserve enough technical context for a later project report.
 - Added a naive sequential temporal Johnson counter. This version keeps a
   per-start-edge timestamp DFS with explicit visited/path state and validates
   against the temporal brute-force oracle before later closing-time pruning.
+- Added conservative closing-time pruning to sequential temporal Johnson. The
+  pruning records timestamp thresholds for vertices that cannot temporally
+  reach the root inside a fixed start window, and exposes lightweight counters
+  so tests and benchmark reports can show when pruning occurs.
 
 ### Notes
 
