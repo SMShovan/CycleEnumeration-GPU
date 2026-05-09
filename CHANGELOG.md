@@ -43,6 +43,10 @@ intended to preserve enough technical context for a later project report.
   directed edges, preserves duplicate timestamps, and sorts timestamp lists.
 - Added parser tests for comments, duplicate edge grouping, timestamp sorting,
   self-loop skipping, missing files, malformed rows, and vertex-id compaction.
+- Added CSR and CSC graph views with flat timestamp storage. The outgoing view
+  supports forward traversal, the incoming view supports reverse reachability
+  and future cycle-union preprocessing, and shared timestamp ranges keep both
+  views consistent for CPU and CUDA transfer planning.
 
 ### Notes
 

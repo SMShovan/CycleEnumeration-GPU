@@ -15,6 +15,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(cycle_enum_core_test
   unit/graph_parser_test.cpp
+  unit/graph_view_test.cpp
   unit/histogram_test.cpp
   unit/options_test.cpp
   unit/result_test.cpp

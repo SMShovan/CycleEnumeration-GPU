@@ -13,6 +13,7 @@ include(cmake/Sanitizers.cmake)
 include(cmake/Doxygen.cmake)
 
 add_library(cycle_enum_core
+  src/core/graph_builder.cpp
   src/core/graph.cpp
   src/core/histogram.cpp
   src/core/options.cpp
