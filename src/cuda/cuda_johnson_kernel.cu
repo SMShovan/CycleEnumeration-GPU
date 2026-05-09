@@ -129,52 +129,84 @@ __device__ bool path_contains(const VertexId* path,
   return false;
 }
 
+__device__ void clear_block_histogram(unsigned long long* block_histogram,
+                                      const int max_cycle_length) {
+  for (int index = threadIdx.x; index <= max_cycle_length;
+       index += blockDim.x) {
+    block_histogram[index] = 0ULL;
+  }
+  __syncthreads();
+}
+
+__device__ void increment_block_histogram(unsigned long long* block_histogram,
+                                          const int cycle_length) {
+  atomicAdd(&block_histogram[cycle_length], 1ULL);
+}
+
+__device__ void flush_block_histogram(unsigned long long* block_histogram,
+                                      unsigned long long* global_histogram,
+                                      const int max_cycle_length) {
+  __syncthreads();
+  for (int index = threadIdx.x; index <= max_cycle_length;
+       index += blockDim.x) {
+    const unsigned long long count = block_histogram[index];
+    if (count != 0ULL) {
+      atomicAdd(&global_histogram[index], count);
+    }
+  }
+}
+
 __global__ void count_roots_kernel(DeviceGraphView graph,
                                    int max_cycle_length,
                                    VertexId* paths,
                                    DeviceOffset* cursors,
                                    unsigned long long* histogram) {
+  extern __shared__ unsigned long long block_histogram[];
+  clear_block_histogram(block_histogram, max_cycle_length);
+
   const DeviceOffset root =
       static_cast<DeviceOffset>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (root >= graph.vertex_count) {
-    return;
+  if (root < graph.vertex_count) {
+    const DeviceOffset thread_id = root;
+    const DeviceOffset base =
+        thread_id * static_cast<DeviceOffset>(max_cycle_length);
+    int depth = 1;
+    paths[base] = static_cast<VertexId>(root);
+    cursors[base] = graph.outgoing_offsets[root];
+
+    while (depth > 0) {
+      const VertexId current =
+          paths[base + static_cast<DeviceOffset>(depth - 1)];
+      const DeviceOffset end = graph.outgoing_offsets[current + 1];
+      DeviceOffset& cursor =
+          cursors[base + static_cast<DeviceOffset>(depth - 1)];
+
+      if (cursor >= end) {
+        --depth;
+        continue;
+      }
+
+      const VertexId next = graph.outgoing_edges[cursor].vertex;
+      ++cursor;
+
+      if (next == root && depth >= 2) {
+        increment_block_histogram(block_histogram, depth);
+        continue;
+      }
+
+      if (next <= root || depth >= max_cycle_length ||
+          path_contains(paths, base, depth, next)) {
+        continue;
+      }
+
+      paths[base + static_cast<DeviceOffset>(depth)] = next;
+      cursors[base + static_cast<DeviceOffset>(depth)] =
+          graph.outgoing_offsets[next];
+      ++depth;
+    }
   }
 
-  const DeviceOffset thread_id = root;
-  const DeviceOffset base =
-      thread_id * static_cast<DeviceOffset>(max_cycle_length);
-  int depth = 1;
-  paths[base] = static_cast<VertexId>(root);
-  cursors[base] = graph.outgoing_offsets[root];
-
-  while (depth > 0) {
-    const VertexId current = paths[base + static_cast<DeviceOffset>(depth - 1)];
-    const DeviceOffset end = graph.outgoing_offsets[current + 1];
-    DeviceOffset& cursor = cursors[base + static_cast<DeviceOffset>(depth - 1)];
-
-    if (cursor >= end) {
-      --depth;
-      continue;
-    }
-
-    const VertexId next = graph.outgoing_edges[cursor].vertex;
-    ++cursor;
-
-    if (next == root && depth >= 2) {
-      atomicAdd(&histogram[depth], 1ULL);
-      continue;
-    }
-
-    if (next <= root || depth >= max_cycle_length ||
-        path_contains(paths, base, depth, next)) {
-      continue;
-    }
-
-    paths[base + static_cast<DeviceOffset>(depth)] = next;
-    cursors[base + static_cast<DeviceOffset>(depth)] =
-        graph.outgoing_offsets[next];
-    ++depth;
-  }
+  flush_block_histogram(block_histogram, histogram, max_cycle_length);
 }
 
 __global__ void count_time_window_start_events_kernel(
@@ -186,57 +218,62 @@ __global__ void count_time_window_start_events_kernel(
     VertexId* paths,
     DeviceOffset* cursors,
     unsigned long long* histogram) {
+  extern __shared__ unsigned long long block_histogram[];
+  clear_block_histogram(block_histogram, max_cycle_length);
+
   const DeviceOffset event_id =
       static_cast<DeviceOffset>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (event_id >= start_event_count) {
-    return;
+  if (event_id < start_event_count) {
+    const CudaStartEvent event = start_events[event_id];
+    const DeviceOffset base =
+        event_id * static_cast<DeviceOffset>(max_cycle_length);
+    int depth = 2;
+    paths[base] = event.root;
+    paths[base + 1] = event.first_vertex;
+    cursors[base + 1] = graph.outgoing_offsets[event.first_vertex];
+
+    while (depth > 1) {
+      const VertexId current =
+          paths[base + static_cast<DeviceOffset>(depth - 1)];
+      const DeviceOffset end = graph.outgoing_offsets[current + 1];
+      DeviceOffset& cursor =
+          cursors[base + static_cast<DeviceOffset>(depth - 1)];
+
+      if (cursor >= end) {
+        --depth;
+        continue;
+      }
+
+      const CudaAdjacencyEntry edge = graph.outgoing_edges[cursor];
+      ++cursor;
+
+      const CudaTimestampStartPolicy policy =
+          event.root > current ? CudaTimestampStartPolicy::Inclusive
+                               : CudaTimestampStartPolicy::AfterStart;
+      if (!has_timestamp_in_window(graph.timestamps, edge.timestamp_begin,
+                                   edge.timestamp_end, event.start_timestamp,
+                                   window_width, policy)) {
+        continue;
+      }
+
+      const VertexId next = edge.vertex;
+      if (next == event.root && depth >= 2) {
+        increment_block_histogram(block_histogram, depth);
+        continue;
+      }
+
+      if (depth >= max_cycle_length || path_contains(paths, base, depth, next)) {
+        continue;
+      }
+
+      paths[base + static_cast<DeviceOffset>(depth)] = next;
+      cursors[base + static_cast<DeviceOffset>(depth)] =
+          graph.outgoing_offsets[next];
+      ++depth;
+    }
   }
 
-  const CudaStartEvent event = start_events[event_id];
-  const DeviceOffset base =
-      event_id * static_cast<DeviceOffset>(max_cycle_length);
-  int depth = 2;
-  paths[base] = event.root;
-  paths[base + 1] = event.first_vertex;
-  cursors[base + 1] = graph.outgoing_offsets[event.first_vertex];
-
-  while (depth > 1) {
-    const VertexId current = paths[base + static_cast<DeviceOffset>(depth - 1)];
-    const DeviceOffset end = graph.outgoing_offsets[current + 1];
-    DeviceOffset& cursor = cursors[base + static_cast<DeviceOffset>(depth - 1)];
-
-    if (cursor >= end) {
-      --depth;
-      continue;
-    }
-
-    const CudaAdjacencyEntry edge = graph.outgoing_edges[cursor];
-    ++cursor;
-
-    const CudaTimestampStartPolicy policy =
-        event.root > current ? CudaTimestampStartPolicy::Inclusive
-                             : CudaTimestampStartPolicy::AfterStart;
-    if (!has_timestamp_in_window(graph.timestamps, edge.timestamp_begin,
-                                 edge.timestamp_end, event.start_timestamp,
-                                 window_width, policy)) {
-      continue;
-    }
-
-    const VertexId next = edge.vertex;
-    if (next == event.root && depth >= 2) {
-      atomicAdd(&histogram[depth], 1ULL);
-      continue;
-    }
-
-    if (depth >= max_cycle_length || path_contains(paths, base, depth, next)) {
-      continue;
-    }
-
-    paths[base + static_cast<DeviceOffset>(depth)] = next;
-    cursors[base + static_cast<DeviceOffset>(depth)] =
-        graph.outgoing_offsets[next];
-    ++depth;
-  }
+  flush_block_histogram(block_histogram, histogram, max_cycle_length);
 }
 
 __global__ void count_temporal_start_events_kernel(
@@ -252,83 +289,87 @@ __global__ void count_temporal_start_events_kernel(
     DeviceOffset* timestamp_ends,
     Timestamp* arrival_timestamps,
     unsigned long long* histogram) {
+  extern __shared__ unsigned long long block_histogram[];
+  clear_block_histogram(block_histogram, max_cycle_length);
+
   const DeviceOffset event_id =
       static_cast<DeviceOffset>(blockIdx.x) * blockDim.x + threadIdx.x;
-  if (event_id >= start_event_count) {
-    return;
-  }
+  if (event_id < start_event_count) {
+    const CudaStartEvent event = start_events[event_id];
+    Timestamp window_end = 0;
+    if (checked_window_end(event.start_timestamp, window_width, window_end)) {
+      const DeviceOffset base =
+          event_id * static_cast<DeviceOffset>(max_cycle_length);
+      int depth = 2;
+      paths[base] = event.root;
+      paths[base + 1] = event.first_vertex;
+      arrival_timestamps[base] = event.start_timestamp;
+      arrival_timestamps[base + 1] = event.start_timestamp;
+      edge_cursors[base + 1] = graph.outgoing_offsets[event.first_vertex];
+      active_edges[base + 1] = 0;
+      timestamp_cursors[base + 1] = 0;
+      timestamp_ends[base + 1] = 0;
 
-  const CudaStartEvent event = start_events[event_id];
-  Timestamp window_end = 0;
-  if (!checked_window_end(event.start_timestamp, window_width, window_end)) {
-    return;
-  }
+      while (depth > 1) {
+        const DeviceOffset frame = base + static_cast<DeviceOffset>(depth - 1);
+        const VertexId current = paths[frame];
 
-  const DeviceOffset base =
-      event_id * static_cast<DeviceOffset>(max_cycle_length);
-  int depth = 2;
-  paths[base] = event.root;
-  paths[base + 1] = event.first_vertex;
-  arrival_timestamps[base] = event.start_timestamp;
-  arrival_timestamps[base + 1] = event.start_timestamp;
-  edge_cursors[base + 1] = graph.outgoing_offsets[event.first_vertex];
-  active_edges[base + 1] = 0;
-  timestamp_cursors[base + 1] = 0;
-  timestamp_ends[base + 1] = 0;
+        if (timestamp_cursors[frame] < timestamp_ends[frame]) {
+          const DeviceOffset timestamp_offset = timestamp_cursors[frame];
+          ++timestamp_cursors[frame];
+          const Timestamp next_timestamp = graph.timestamps[timestamp_offset];
+          const CudaAdjacencyEntry edge =
+              graph.outgoing_edges[active_edges[frame]];
+          const VertexId next = edge.vertex;
 
-  while (depth > 1) {
-    const DeviceOffset frame = base + static_cast<DeviceOffset>(depth - 1);
-    const VertexId current = paths[frame];
+          if (next == event.root && depth >= 2) {
+            increment_block_histogram(block_histogram, depth);
+            continue;
+          }
 
-    if (timestamp_cursors[frame] < timestamp_ends[frame]) {
-      const DeviceOffset timestamp_offset = timestamp_cursors[frame];
-      ++timestamp_cursors[frame];
-      const Timestamp next_timestamp = graph.timestamps[timestamp_offset];
-      const CudaAdjacencyEntry edge = graph.outgoing_edges[active_edges[frame]];
-      const VertexId next = edge.vertex;
+          if (depth >= max_cycle_length ||
+              path_contains(paths, base, depth, next)) {
+            continue;
+          }
 
-      if (next == event.root && depth >= 2) {
-        atomicAdd(&histogram[depth], 1ULL);
-        continue;
+          const DeviceOffset next_frame =
+              base + static_cast<DeviceOffset>(depth);
+          paths[next_frame] = next;
+          arrival_timestamps[next_frame] = next_timestamp;
+          edge_cursors[next_frame] = graph.outgoing_offsets[next];
+          active_edges[next_frame] = 0;
+          timestamp_cursors[next_frame] = 0;
+          timestamp_ends[next_frame] = 0;
+          ++depth;
+          continue;
+        }
+
+        const DeviceOffset edge_end = graph.outgoing_offsets[current + 1];
+        DeviceOffset& edge_cursor = edge_cursors[frame];
+        if (edge_cursor >= edge_end) {
+          --depth;
+          continue;
+        }
+
+        const DeviceOffset edge_offset = edge_cursor;
+        ++edge_cursor;
+        const CudaAdjacencyEntry edge = graph.outgoing_edges[edge_offset];
+        const CudaTimestampRange range =
+            timestamps_after(graph.timestamps, edge.timestamp_begin,
+                             edge.timestamp_end, arrival_timestamps[frame],
+                             window_end);
+        if (range.empty()) {
+          continue;
+        }
+
+        active_edges[frame] = edge_offset;
+        timestamp_cursors[frame] = range.begin;
+        timestamp_ends[frame] = range.end;
       }
-
-      if (depth >= max_cycle_length || path_contains(paths, base, depth, next)) {
-        continue;
-      }
-
-      const DeviceOffset next_frame = base + static_cast<DeviceOffset>(depth);
-      paths[next_frame] = next;
-      arrival_timestamps[next_frame] = next_timestamp;
-      edge_cursors[next_frame] = graph.outgoing_offsets[next];
-      active_edges[next_frame] = 0;
-      timestamp_cursors[next_frame] = 0;
-      timestamp_ends[next_frame] = 0;
-      ++depth;
-      continue;
     }
-
-    const DeviceOffset edge_end = graph.outgoing_offsets[current + 1];
-    DeviceOffset& edge_cursor = edge_cursors[frame];
-    if (edge_cursor >= edge_end) {
-      --depth;
-      continue;
-    }
-
-    const DeviceOffset edge_offset = edge_cursor;
-    ++edge_cursor;
-    const CudaAdjacencyEntry edge = graph.outgoing_edges[edge_offset];
-    const CudaTimestampRange range =
-        timestamps_after(graph.timestamps, edge.timestamp_begin,
-                         edge.timestamp_end, arrival_timestamps[frame],
-                         window_end);
-    if (range.empty()) {
-      continue;
-    }
-
-    active_edges[frame] = edge_offset;
-    timestamp_cursors[frame] = range.begin;
-    timestamp_ends[frame] = range.end;
   }
+
+  flush_block_histogram(block_histogram, histogram, max_cycle_length);
 }
 
 std::size_t checked_allocation_count(const DeviceOffset count,
@@ -365,6 +406,14 @@ unsigned int checked_grid_blocks(const DeviceOffset work_count,
     throw std::overflow_error(message.str());
   }
   return static_cast<unsigned int>(blocks);
+}
+
+std::size_t shared_histogram_bytes(const std::size_t max_cycle_length) {
+  if (max_cycle_length >=
+      std::numeric_limits<std::size_t>::max() / sizeof(unsigned long long)) {
+    throw std::overflow_error("shared histogram allocation overflows size_t");
+  }
+  return (max_cycle_length + 1) * sizeof(unsigned long long);
 }
 
 std::vector<CudaStartEvent> build_time_window_start_events(
@@ -437,7 +486,8 @@ CycleHistogram count_simple_cycles_johnson_device(
   constexpr unsigned int block_size = 128;
   const unsigned int blocks =
       checked_grid_blocks(graph.vertex_count, block_size, "vertex count");
-  count_roots_kernel<<<blocks, block_size>>>(
+  const std::size_t shared_bytes = shared_histogram_bytes(max_cycle_length);
+  count_roots_kernel<<<blocks, block_size, shared_bytes>>>(
       device_graph, static_cast<int>(max_cycle_length), paths.get(),
       cursors.get(), histogram.get());
   check_cuda(cudaGetLastError(), "count_roots_kernel launch");
@@ -513,7 +563,8 @@ CycleHistogram count_time_window_cycles_johnson_device(
   constexpr unsigned int block_size = 128;
   const unsigned int blocks =
       checked_grid_blocks(start_event_count, block_size, "start event count");
-  count_time_window_start_events_kernel<<<blocks, block_size>>>(
+  const std::size_t shared_bytes = shared_histogram_bytes(max_cycle_length);
+  count_time_window_start_events_kernel<<<blocks, block_size, shared_bytes>>>(
       device_graph, device_start_events.get(), start_event_count, window_width,
       static_cast<int>(max_cycle_length), paths.get(), cursors.get(),
       histogram.get());
@@ -599,7 +650,8 @@ CycleHistogram count_temporal_cycles_johnson_device(
   constexpr unsigned int block_size = 128;
   const unsigned int blocks =
       checked_grid_blocks(start_event_count, block_size, "start event count");
-  count_temporal_start_events_kernel<<<blocks, block_size>>>(
+  const std::size_t shared_bytes = shared_histogram_bytes(max_cycle_length);
+  count_temporal_start_events_kernel<<<blocks, block_size, shared_bytes>>>(
       device_graph, device_start_events.get(), start_event_count, window_width,
       static_cast<int>(max_cycle_length), paths.get(), edge_cursors.get(),
       active_edges.get(), timestamp_cursors.get(), timestamp_ends.get(),

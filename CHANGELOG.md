@@ -165,6 +165,10 @@ intended to preserve enough technical context for a later project report.
   for active edges and timestamp candidates so each valid timestamp assignment
   is counted explicitly, providing a correctness-first GPU temporal baseline
   before path bundling, pruning, and dynamic work distribution are introduced.
+- Added per-block shared-memory histogram aggregation to CUDA Johnson kernels.
+  Threads now accumulate cycle-length counts inside a block and flush one
+  value per length to global memory, reducing global atomic contention for
+  cycle-heavy graphs.
 
 ### Notes
 
