@@ -34,6 +34,10 @@ intended to preserve enough technical context for a later project report.
   common interface.
 - Added unit tests for option defaults, option validation, status names, and
   runtime-statistic defaults.
+- Added a deterministic cycle histogram utility with ordered output, merging,
+  total-count reporting, and overflow checks. This will be the shared result
+  container for correctness tests, CLI output, benchmark logs, and baseline
+  comparisons.
 
 ### Notes
 

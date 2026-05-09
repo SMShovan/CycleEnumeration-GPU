@@ -14,6 +14,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(cycle_enum_core_test
+  unit/histogram_test.cpp
   unit/options_test.cpp
   unit/result_test.cpp
   unit/smoke_test.cpp
