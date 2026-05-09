@@ -2,6 +2,7 @@
 #include "cycle_enum/core/graph_view.hpp"
 #include "cycle_enum/core/options.hpp"
 #include "cycle_enum/core/version.hpp"
+#include "cycle_enum/cuda/cuda_johnson.hpp"
 #include "cycle_enum/openmp/openmp_johnson.hpp"
 #include "cycle_enum/openmp/openmp_read_tarjan.hpp"
 #include "cycle_enum/openmp/openmp_temporal_johnson.hpp"
@@ -45,6 +46,7 @@ void print_usage(std::ostream& out) {
       << "  --time-window <positive integer>\n"
       << "  --max-cycle-length <integer >= 2>\n"
       << "  --openmp-threads <positive integer>\n"
+      << "  --cuda-device <non-negative integer>\n"
       << "  --help\n"
       << "  --version\n";
 }
@@ -132,7 +134,16 @@ template <typename Integer>
   std::vector<std::string> errors;
 
   if (options.execution == cycle_enum::ExecutionPolicy::Cuda) {
-    errors.emplace_back("cuda backend is not implemented in the CLI yet");
+    if (options.algorithm != cycle_enum::AlgorithmFamily::Johnson) {
+      errors.emplace_back("cuda backend currently supports only johnson");
+    }
+    if (options.mode != cycle_enum::CycleMode::Simple) {
+      errors.emplace_back("cuda backend currently supports only simple mode");
+    }
+    if (!options.max_cycle_length.has_value()) {
+      errors.emplace_back(
+          "cuda backend requires --max-cycle-length for bounded device stacks");
+    }
   }
 
   if (options.execution == cycle_enum::ExecutionPolicy::OpenMP) {
@@ -234,6 +245,19 @@ template <typename Integer>
         return std::nullopt;
       }
       config.options.openmp_threads = *parsed;
+      continue;
+    }
+
+    if (option == "--cuda-device" || option == "--device") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<int>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.options.cuda_device_id = *parsed;
       continue;
     }
 
@@ -383,6 +407,19 @@ template <typename Integer>
   throw std::logic_error("unsupported OpenMP cycle counting mode");
 }
 
+[[nodiscard]] cycle_enum::CycleHistogram run_cuda(
+    const cycle_enum::GraphView& graph,
+    const cycle_enum::CycleEnumerationOptions& options) {
+  if (options.mode == cycle_enum::CycleMode::Simple &&
+      options.algorithm == cycle_enum::AlgorithmFamily::Johnson &&
+      options.max_cycle_length.has_value()) {
+    return cycle_enum::cuda::count_simple_cycles_johnson(
+        graph, options.cuda_device_id, *options.max_cycle_length);
+  }
+
+  throw std::logic_error("unsupported CUDA cycle counting mode");
+}
+
 [[nodiscard]] cycle_enum::CycleHistogram run_backend(
     const cycle_enum::GraphView& graph,
     const cycle_enum::CycleEnumerationOptions& options) {
@@ -392,7 +429,7 @@ template <typename Integer>
     case cycle_enum::ExecutionPolicy::OpenMP:
       return run_openmp(graph, options);
     case cycle_enum::ExecutionPolicy::Cuda:
-      break;
+      return run_cuda(graph, options);
   }
 
   throw std::logic_error("unsupported execution backend");

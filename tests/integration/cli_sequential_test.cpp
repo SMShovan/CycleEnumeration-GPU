@@ -215,4 +215,51 @@ TEST(CliOpenMPTest, RejectsUnsupportedTimeWindowMode) {
   EXPECT_NE(output.find("openmp backend does not implement"), std::string::npos);
 }
 
+TEST(CliCudaTest, RequiresMaximumCycleLength) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "cuda",
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "simple",
+      },
+      status);
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("cuda backend requires --max-cycle-length"),
+            std::string::npos);
+}
+
+TEST(CliCudaTest, ReportsUnavailableBackendWhenNotCompiled) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "cuda",
+          "--cuda-device",
+          "0",
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "simple",
+          "--max-cycle-length",
+          "4",
+      },
+      status);
+
+  if (output.find("CUDA support is not compiled") == std::string::npos) {
+    GTEST_SKIP() << "CUDA support is compiled in this test build";
+  }
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("CUDA support is not compiled"), std::string::npos);
+}
+
 }  // namespace

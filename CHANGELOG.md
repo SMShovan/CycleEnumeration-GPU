@@ -144,6 +144,10 @@ intended to preserve enough technical context for a later project report.
   cycle-length histogram; non-CUDA builds expose the same API but fail clearly
   before dispatch. This is a correctness-oriented GPU baseline for later work
   on work queues, occupancy, and reduced atomic contention.
+- Exposed the naive CUDA Johnson backend through the CLI for benchmark scripts.
+  The CLI now accepts `--backend cuda` and `--cuda-device`; CUDA dispatch is
+  intentionally limited to static Johnson with an explicit `--max-cycle-length`
+  until the device stack and work-queue designs are generalized.
 
 ### Notes
 
