@@ -47,6 +47,33 @@ endif()
 
 cycle_enum_configure_sanitizers(cycle_enum_core)
 
+add_library(cycle_enum_sequential
+  src/sequential/bruteforce.cpp
+)
+
+add_library(cycle_enum::sequential ALIAS cycle_enum_sequential)
+
+target_link_libraries(cycle_enum_sequential
+  PUBLIC
+    cycle_enum::core
+)
+
+target_compile_features(cycle_enum_sequential PUBLIC cxx_std_17)
+
+target_include_directories(cycle_enum_sequential
+  PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(cycle_enum_sequential PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+  target_compile_options(cycle_enum_sequential PRIVATE /W4)
+endif()
+
+cycle_enum_configure_sanitizers(cycle_enum_sequential)
+
 if(CYCLE_ENUM_ENABLE_OPENMP)
   message(STATUS "OpenMP option is enabled; OpenMP targets will be added with the OpenMP implementation phase.")
 endif()

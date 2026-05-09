@@ -14,6 +14,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(cycle_enum_core_test
+  unit/bruteforce_test.cpp
   unit/graph_parser_test.cpp
   unit/graph_view_test.cpp
   unit/histogram_test.cpp
@@ -25,7 +26,7 @@ add_executable(cycle_enum_core_test
 
 target_link_libraries(cycle_enum_core_test
   PRIVATE
-    cycle_enum::core
+    cycle_enum::sequential
     GTest::gtest_main
 )
 

@@ -51,6 +51,10 @@ intended to preserve enough technical context for a later project report.
   strictly-after-start lookup, and temporal increasing-order lookup. These
   helpers define the boundary semantics that CPU and CUDA algorithms will need
   to match.
+- Added a tiny-graph brute-force simple-cycle oracle. It exhaustively searches
+  directed cycles while counting each cycle once by requiring the root to be the
+  smallest compact vertex in the cycle. This oracle is intended for correctness
+  tests of Johnson, Read-Tarjan, OpenMP, and CUDA implementations.
 
 ### Notes
 
