@@ -108,6 +108,9 @@ intended to preserve enough technical context for a later project report.
   compares brute-force, Johnson, and Read-Tarjan implementations across static,
   simple time-window, and temporal modes so future OpenMP/CUDA work has a
   stable correctness gate.
+- Added OpenMP build detection and runtime configuration helpers. The new
+  `cycle_enum::openmp` target reports availability, max thread count, and
+  validates requested thread counts while non-OpenMP builds remain usable.
 
 ### Notes
 

@@ -28,6 +28,7 @@ add_executable(cycle_enum_core_test
   unit/graph_parser_test.cpp
   unit/graph_view_test.cpp
   unit/histogram_test.cpp
+  unit/openmp_config_test.cpp
   unit/options_test.cpp
   unit/result_test.cpp
   unit/smoke_test.cpp
@@ -38,6 +39,7 @@ add_executable(cycle_enum_core_test
 target_link_libraries(cycle_enum_core_test
   PRIVATE
     cycle_enum::sequential
+    cycle_enum::openmp
     GTest::gtest_main
 )
 

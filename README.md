@@ -32,6 +32,9 @@ counters. Sequential Johnson and Read-Tarjan modes are available through the
 `cycle-enum` command-line driver for static simple cycles and simple
 time-window counting.
 
+OpenMP runtime detection is wired into the build, but parallel OpenMP counters
+will be added in the next implementation steps.
+
 ## Build and Run
 
 ```sh

@@ -79,6 +79,31 @@ endif()
 
 cycle_enum_configure_sanitizers(cycle_enum_sequential)
 
+add_library(cycle_enum_openmp
+  src/openmp/openmp_config.cpp
+)
+
+add_library(cycle_enum::openmp ALIAS cycle_enum_openmp)
+
+target_link_libraries(cycle_enum_openmp
+  PUBLIC
+    cycle_enum::core
+)
+
+target_compile_features(cycle_enum_openmp PUBLIC cxx_std_17)
+
+target_include_directories(cycle_enum_openmp
+  PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(cycle_enum_openmp PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+  target_compile_options(cycle_enum_openmp PRIVATE /W4)
+endif()
+
 add_executable(cycle_enum_cli
   src/cli/cycle_enum_main.cpp
 )
@@ -103,9 +128,24 @@ endif()
 
 cycle_enum_configure_sanitizers(cycle_enum_cli)
 
+set(CYCLE_ENUM_OPENMP_AVAILABLE OFF)
 if(CYCLE_ENUM_ENABLE_OPENMP)
-  message(STATUS "OpenMP option is enabled; OpenMP targets will be added with the OpenMP implementation phase.")
+  find_package(OpenMP QUIET)
+  if(OpenMP_CXX_FOUND)
+    set(CYCLE_ENUM_OPENMP_AVAILABLE ON)
+    target_link_libraries(cycle_enum_openmp PUBLIC OpenMP::OpenMP_CXX)
+    message(STATUS "OpenMP support enabled")
+  else()
+    message(WARNING "OpenMP was requested but no OpenMP CXX runtime was found; OpenMP backends will report unavailable.")
+  endif()
 endif()
+
+target_compile_definitions(cycle_enum_openmp
+  PUBLIC
+    CYCLE_ENUM_OPENMP_ENABLED=$<BOOL:${CYCLE_ENUM_OPENMP_AVAILABLE}>
+)
+
+cycle_enum_configure_sanitizers(cycle_enum_openmp)
 
 if(CYCLE_ENUM_ENABLE_CUDA)
   message(STATUS "CUDA option is enabled; CUDA targets will be added with the CUDA infrastructure phase.")
