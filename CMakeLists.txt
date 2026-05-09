@@ -81,6 +81,7 @@ cycle_enum_configure_sanitizers(cycle_enum_sequential)
 
 add_library(cycle_enum_openmp
   src/openmp/openmp_config.cpp
+  src/openmp/openmp_johnson.cpp
 )
 
 add_library(cycle_enum::openmp ALIAS cycle_enum_openmp)

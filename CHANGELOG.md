@@ -111,6 +111,9 @@ intended to preserve enough technical context for a later project report.
 - Added OpenMP build detection and runtime configuration helpers. The new
   `cycle_enum::openmp` target reports availability, max thread count, and
   validates requested thread counts while non-OpenMP builds remain usable.
+- Added the first OpenMP Johnson baseline for static simple cycles. The
+  implementation splits work by root vertex, uses thread-local histograms, and
+  falls back to a single-thread path when OpenMP is unavailable.
 
 ### Notes
 
