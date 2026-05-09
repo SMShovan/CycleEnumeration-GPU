@@ -76,6 +76,30 @@ endif()
 
 cycle_enum_configure_sanitizers(cycle_enum_sequential)
 
+add_executable(cycle_enum_cli
+  src/cli/cycle_enum_main.cpp
+)
+
+set_target_properties(cycle_enum_cli
+  PROPERTIES
+    OUTPUT_NAME cycle-enum
+)
+
+target_link_libraries(cycle_enum_cli
+  PRIVATE
+    cycle_enum::sequential
+)
+
+target_compile_features(cycle_enum_cli PRIVATE cxx_std_17)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(cycle_enum_cli PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+  target_compile_options(cycle_enum_cli PRIVATE /W4)
+endif()
+
+cycle_enum_configure_sanitizers(cycle_enum_cli)
+
 if(CYCLE_ENUM_ENABLE_OPENMP)
   message(STATUS "OpenMP option is enabled; OpenMP targets will be added with the OpenMP implementation phase.")
 endif()

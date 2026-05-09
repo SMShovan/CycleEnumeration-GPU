@@ -26,8 +26,39 @@ focused on CPU threading and one-GPU execution.
 
 ## Current Status
 
-The repository is in the foundation stage. Build files, tests, and algorithm
-implementations will be added progressively in small commits.
+The repository has the foundation, temporal graph parser, CSR/CSC graph view,
+histogram utilities, timestamp helpers, and exact sequential simple-cycle
+counters. Sequential Johnson and Read-Tarjan modes are available through the
+`cycle-enum` command-line driver for static simple cycles and simple
+time-window counting.
+
+## Build and Run
+
+```sh
+cmake -S . -B build -DCYCLE_ENUM_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Example sequential run:
+
+```sh
+./build/cycle-enum --input tests/data/reference_sample.txt \
+  --algorithm johnson \
+  --mode simple-time-window \
+  --time-window 3600
+```
+
+The output uses the baseline-compatible histogram format:
+
+```text
+# cycle_size, num_of_cycles
+2, 1
+3, 1
+4, 2
+5, 1
+Total, 5
+```
 
 ## Target Platform
 
@@ -46,4 +77,3 @@ source target timestamp
 
 Lines beginning with `#` or `%` are treated as comments. Self-loops are ignored
 by the planned parser.
-

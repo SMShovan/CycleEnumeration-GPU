@@ -16,6 +16,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(cycle_enum_core_test
   integration/johnson_static_test.cpp
   integration/johnson_time_window_test.cpp
+  integration/cli_sequential_test.cpp
   integration/read_tarjan_static_test.cpp
   integration/read_tarjan_time_window_test.cpp
   unit/bruteforce_test.cpp
@@ -37,7 +38,10 @@ target_link_libraries(cycle_enum_core_test
 target_compile_definitions(cycle_enum_core_test
   PRIVATE
     CYCLE_ENUM_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data"
+    CYCLE_ENUM_CLI_PATH="$<TARGET_FILE:cycle_enum_cli>"
 )
+
+add_dependencies(cycle_enum_core_test cycle_enum_cli)
 
 include(GoogleTest)
 gtest_discover_tests(cycle_enum_core_test)

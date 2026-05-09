@@ -74,6 +74,10 @@ intended to preserve enough technical context for a later project report.
 - Added sequential Read-Tarjan support for start-edge time-window counting.
   The implementation shares the baseline-compatible timestamp convention used
   by the Johnson time-window path and is checked against the brute-force oracle.
+- Added the first command-line driver for sequential counting. It reads the
+  temporal graph format, dispatches Johnson, Read-Tarjan, or brute-force
+  counters for static and simple time-window modes, and emits the stable
+  histogram format used for later baseline comparisons.
 
 ### Notes
 
