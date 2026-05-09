@@ -117,6 +117,11 @@ intended to preserve enough technical context for a later project report.
 - Added the OpenMP Read-Tarjan static baseline using the same root-level work
   partitioning and thread-local histogram merge strategy, with parity tests
   against the sequential Read-Tarjan counter.
+- Added an OpenMP temporal Johnson baseline that parallelizes by root vertex
+  while keeping DFS path state, closing-time pruning caches, and timestamp
+  bundles private to each worker. The merged instrumentation mirrors the
+  sequential temporal Johnson counters so CPU backend behavior can be compared
+  in later benchmark reports.
 
 ### Notes
 
