@@ -152,6 +152,10 @@ intended to preserve enough technical context for a later project report.
   repeatable CSV measurements for sequential, OpenMP, CUDA, and optional
   SPAA/TBB baseline runs, preserving histograms and command lines so later
   cluster experiments can connect performance numbers back to exact settings.
+- Added CUDA host/device timestamp search helpers. These binary-search
+  primitives mirror the CPU inclusive-window, strict-after-start, and temporal
+  strictly-increasing timestamp semantics that future GPU time-window and
+  temporal kernels will need.
 
 ### Notes
 

@@ -31,6 +31,7 @@ add_executable(cycle_enum_core_test
   unit/bruteforce_test.cpp
   unit/cuda_config_test.cpp
   unit/cuda_graph_test.cpp
+  unit/cuda_timestamp_test.cpp
   unit/cycle_union_test.cpp
   unit/graph_parser_test.cpp
   unit/graph_view_test.cpp
