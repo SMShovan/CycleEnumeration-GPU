@@ -70,6 +70,23 @@ TEST(GraphViewTest, PreservesIncomingAdjacency) {
   EXPECT_EQ(into_zero_from_thirty.timestamp_end, 4U);
 }
 
+TEST(GraphViewTest, OrdersProgrammaticAdjacencyByNeighbor) {
+  const cycle_enum::TemporalGraph graph(
+      {0, 1, 2},
+      {
+          {1, 2, {0}},
+          {1, 0, {0}},
+          {0, 1, {0}},
+      });
+
+  const cycle_enum::GraphView view = cycle_enum::build_graph_view(graph);
+
+  const std::size_t begin = view.outgoing_offsets()[1];
+  ASSERT_EQ(view.outgoing_offsets()[2] - begin, 2U);
+  EXPECT_EQ(view.outgoing_edges()[begin].vertex, 0U);
+  EXPECT_EQ(view.outgoing_edges()[begin + 1].vertex, 2U);
+}
+
 TEST(GraphViewTest, RejectsInvalidDegreeQueries) {
   const cycle_enum::GraphView view = cycle_enum::build_graph_view(sample_graph());
 
@@ -78,4 +95,3 @@ TEST(GraphViewTest, RejectsInvalidDegreeQueries) {
 }
 
 }  // namespace
-

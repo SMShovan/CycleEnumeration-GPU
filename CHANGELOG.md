@@ -101,6 +101,13 @@ intended to preserve enough technical context for a later project report.
   computes a conservative forward/reverse reachability intersection inside a
   start edge's window, with tests for dead-branch removal, window handling, and
   invalid requests.
+- Made CSR/CSC adjacency order deterministic for programmatically constructed
+  graphs by sorting each vertex's adjacency entries by neighbor. This keeps
+  path-extension algorithms consistent with parser-built graphs.
+- Added a sequential validation matrix and validation design note. The matrix
+  compares brute-force, Johnson, and Read-Tarjan implementations across static,
+  simple time-window, and temporal modes so future OpenMP/CUDA work has a
+  stable correctness gate.
 
 ### Notes
 

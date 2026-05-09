@@ -1,5 +1,6 @@
 #include "cycle_enum/core/graph_view.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 
@@ -111,6 +112,20 @@ GraphView build_graph_view(const TemporalGraph& graph) {
     ++edge_id;
   }
 
+  for (std::size_t vertex = 0; vertex < graph.vertex_count(); ++vertex) {
+    auto order_entries = [](const AdjacencyEntry& lhs,
+                            const AdjacencyEntry& rhs) {
+      if (lhs.vertex != rhs.vertex) {
+        return lhs.vertex < rhs.vertex;
+      }
+      return lhs.edge_id < rhs.edge_id;
+    };
+    std::sort(outgoing_by_vertex[vertex].begin(),
+              outgoing_by_vertex[vertex].end(), order_entries);
+    std::sort(incoming_by_vertex[vertex].begin(),
+              incoming_by_vertex[vertex].end(), order_entries);
+  }
+
   std::vector<std::size_t> outgoing_offsets(graph.vertex_count() + 1, 0);
   std::vector<std::size_t> incoming_offsets(graph.vertex_count() + 1, 0);
   std::vector<AdjacencyEntry> outgoing_edges;
@@ -137,4 +152,3 @@ GraphView build_graph_view(const TemporalGraph& graph) {
 }
 
 }  // namespace cycle_enum
-
