@@ -78,6 +78,10 @@ intended to preserve enough technical context for a later project report.
   temporal graph format, dispatches Johnson, Read-Tarjan, or brute-force
   counters for static and simple time-window modes, and emits the stable
   histogram format used for later baseline comparisons.
+- Added a brute-force oracle for temporal cycles. It counts timestamped cycle
+  instances by requiring strictly increasing edge timestamps within the start
+  edge's window, which gives later optimized temporal implementations a small
+  but exact validator.
 
 ### Notes
 

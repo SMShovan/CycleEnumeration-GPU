@@ -41,4 +41,17 @@ namespace cycle_enum::sequential {
     Timestamp window_width,
     std::optional<std::size_t> max_cycle_length = std::nullopt);
 
+/**
+ * @brief Count temporal simple cycles with exhaustive timestamp DFS.
+ *
+ * A start edge event fixes the first timestamp and the window end. Every later
+ * edge event in the cycle must have a strictly larger timestamp and remain
+ * within that window. The function counts timestamped cycle instances, so two
+ * valid timestamp assignments on the same vertex cycle contribute two counts.
+ */
+[[nodiscard]] CycleHistogram count_temporal_cycles_bruteforce(
+    const GraphView& graph,
+    Timestamp window_width,
+    std::optional<std::size_t> max_cycle_length = std::nullopt);
+
 }  // namespace cycle_enum::sequential

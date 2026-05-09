@@ -26,6 +26,7 @@ add_executable(cycle_enum_core_test
   unit/options_test.cpp
   unit/result_test.cpp
   unit/smoke_test.cpp
+  unit/temporal_bruteforce_test.cpp
   unit/timestamp_test.cpp
 )
 
