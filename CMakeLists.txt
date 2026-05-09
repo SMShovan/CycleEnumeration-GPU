@@ -222,4 +222,26 @@ if(CYCLE_ENUM_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
+if(CYCLE_ENUM_BUILD_BENCHMARKS)
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_custom_target(cycle_enum_benchmark_smoke
+    COMMAND
+      ${Python3_EXECUTABLE}
+      ${PROJECT_SOURCE_DIR}/benchmarks/run_cycle_benchmarks.py
+      --cycle-enum $<TARGET_FILE:cycle_enum_cli>
+      --input ${PROJECT_SOURCE_DIR}/tests/data/reference_sample.txt
+      --backend sequential
+      --algorithm johnson
+      --mode simple-time-window
+      --time-window 3600
+      --max-cycle-length 6
+      --warmup 0
+      --repeat 1
+      --output ${PROJECT_BINARY_DIR}/benchmarks/smoke.csv
+    DEPENDS cycle_enum_cli
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    COMMENT "Running a one-case benchmark smoke test"
+  )
+endif()
+
 cycle_enum_configure_doxygen()

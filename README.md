@@ -27,10 +27,11 @@ focused on CPU threading and one-GPU execution.
 ## Current Status
 
 The repository has the foundation, temporal graph parser, CSR/CSC graph view,
-histogram utilities, timestamp helpers, exact sequential counters, and OpenMP
-CPU baselines. The `cycle-enum` command-line driver can run sequential and
-OpenMP static simple-cycle counters plus temporal Johnson and Read-Tarjan
-counters.
+histogram utilities, timestamp helpers, exact sequential counters, OpenMP CPU
+baselines, and the first bounded CUDA Johnson baseline. The `cycle-enum`
+command-line driver can run sequential and OpenMP static/temporal Johnson and
+Read-Tarjan counters, and can dispatch the current CUDA static Johnson backend
+when built on an NVIDIA CUDA system.
 
 CUDA runtime detection is wired into the build as an optional target. On
 non-CUDA machines it compiles as an unavailable backend; on NVIDIA systems,
@@ -80,6 +81,29 @@ Development starts on macOS, where CUDA kernels cannot be executed locally.
 CUDA code will therefore be written to compile on NVIDIA systems and guarded so
 non-CUDA builds remain usable. Final GPU validation and performance measurement
 are intended for a Linux cluster with NVIDIA H100 GPUs.
+
+## Benchmarking
+
+The benchmark harness in `benchmarks/run_cycle_benchmarks.py` wraps the project
+CLI and can also wrap the original SPAA/TBB `cycle` executable. It writes one
+CSV row per measured run with elapsed time, parsed histogram, total cycle
+count, backend metadata, and the exact command line.
+
+```sh
+python3 benchmarks/run_cycle_benchmarks.py \
+  --cycle-enum build/cycle-enum \
+  --input tests/data/reference_sample.txt \
+  --backend sequential \
+  --algorithm johnson \
+  --mode simple-time-window \
+  --time-window 3600 \
+  --max-cycle-length 6 \
+  --warmup 0 \
+  --repeat 1 \
+  --output benchmarks/results/local-smoke.csv
+```
+
+See `benchmarks/README.md` for cluster and TBB baseline examples.
 
 ## Input Format
 

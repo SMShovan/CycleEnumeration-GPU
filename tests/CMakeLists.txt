@@ -61,3 +61,28 @@ add_dependencies(cycle_enum_core_test cycle_enum_cli)
 
 include(GoogleTest)
 gtest_discover_tests(cycle_enum_core_test)
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  add_test(
+    NAME benchmark_harness_smoke
+    COMMAND
+      ${Python3_EXECUTABLE}
+      ${PROJECT_SOURCE_DIR}/benchmarks/run_cycle_benchmarks.py
+      --cycle-enum $<TARGET_FILE:cycle_enum_cli>
+      --input ${PROJECT_SOURCE_DIR}/tests/data/reference_sample.txt
+      --backend sequential
+      --algorithm johnson
+      --mode simple-time-window
+      --time-window 3600
+      --max-cycle-length 6
+      --warmup 0
+      --repeat 1
+      --output ${PROJECT_BINARY_DIR}/benchmarks/ctest-smoke.csv
+  )
+  set_tests_properties(benchmark_harness_smoke
+    PROPERTIES
+      LABELS benchmark
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+  )
+endif()

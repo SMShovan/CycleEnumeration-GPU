@@ -148,9 +148,13 @@ intended to preserve enough technical context for a later project report.
   The CLI now accepts `--backend cuda` and `--cuda-device`; CUDA dispatch is
   intentionally limited to static Johnson with an explicit `--max-cycle-length`
   until the device stack and work-queue designs are generalized.
+- Added a dependency-free benchmark harness under `benchmarks/`. It records
+  repeatable CSV measurements for sequential, OpenMP, CUDA, and optional
+  SPAA/TBB baseline runs, preserving histograms and command lines so later
+  cluster experiments can connect performance numbers back to exact settings.
 
 ### Notes
 
-- No cycle enumeration algorithm code has been added yet. These foundation
-  steps keep the public repository clean before graph parsing, tests, and
-  algorithm implementations are introduced.
+- CUDA kernels are guarded for non-CUDA development machines. Local validation
+  checks host code, CLI behavior, documentation, and unavailable-backend paths;
+  kernel compilation and GPU timing are expected on the H100 cluster build.

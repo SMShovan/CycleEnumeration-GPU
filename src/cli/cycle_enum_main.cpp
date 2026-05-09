@@ -41,7 +41,7 @@ void print_usage(std::ostream& out) {
   out << "Usage: cycle-enum --input <path> [options]\n\n"
       << "Options:\n"
       << "  --algorithm <johnson|read-tarjan|brute-force>\n"
-      << "  --backend <sequential|openmp>\n"
+      << "  --backend <sequential|openmp|cuda>\n"
       << "  --mode <simple|simple-time-window|temporal>\n"
       << "  --time-window <positive integer>\n"
       << "  --max-cycle-length <integer >= 2>\n"
