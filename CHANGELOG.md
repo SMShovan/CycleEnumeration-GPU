@@ -161,6 +161,10 @@ intended to preserve enough technical context for a later project report.
   stacks, and uses device timestamp binary search to match the CPU
   inclusive/strict baseline boundary convention before later load-balancing
   and aggregation optimizations.
+- Added a naive CUDA temporal Johnson counter. It keeps per-thread DFS frames
+  for active edges and timestamp candidates so each valid timestamp assignment
+  is counted explicitly, providing a correctness-first GPU temporal baseline
+  before path bundling, pruning, and dynamic work distribution are introduced.
 
 ### Notes
 

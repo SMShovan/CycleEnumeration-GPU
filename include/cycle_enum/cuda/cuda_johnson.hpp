@@ -61,4 +61,30 @@ namespace cycle_enum::cuda {
     Timestamp window_width,
     std::size_t max_cycle_length);
 
+/**
+ * @brief Count temporal simple cycles on one CUDA device.
+ *
+ * The naive temporal CUDA baseline assigns one start-edge timestamp to one GPU
+ * thread and explicitly branches over later timestamp choices. Every next edge
+ * event must be strictly later than the previous event and no later than the
+ * start timestamp plus `window_width`. Duplicate timestamps are preserved as
+ * separate temporal assignments, matching the sequential temporal reference.
+ *
+ * @param graph CSR/CSC graph view.
+ * @param device_id CUDA device ordinal.
+ * @param window_width Inclusive time-window width.
+ * @param max_cycle_length Maximum cycle length to count; must be at least 2.
+ * @return Histogram keyed by cycle length.
+ *
+ * @throws std::invalid_argument if `window_width` is negative or
+ * `max_cycle_length` is less than 2.
+ * @throws std::runtime_error if CUDA support is unavailable in this build.
+ * @throws std::out_of_range if the requested CUDA device is not visible.
+ */
+[[nodiscard]] CycleHistogram count_temporal_cycles_johnson(
+    const GraphView& graph,
+    int device_id,
+    Timestamp window_width,
+    std::size_t max_cycle_length);
+
 }  // namespace cycle_enum::cuda

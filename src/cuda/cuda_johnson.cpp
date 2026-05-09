@@ -50,6 +50,12 @@ namespace detail {
     Timestamp window_width,
     std::size_t max_cycle_length);
 
+[[nodiscard]] CycleHistogram count_temporal_cycles_johnson_device(
+    const CudaGraphData& graph,
+    int device_id,
+    Timestamp window_width,
+    std::size_t max_cycle_length);
+
 }  // namespace detail
 #endif
 
@@ -80,6 +86,25 @@ CycleHistogram count_time_window_cycles_johnson(
 #if CYCLE_ENUM_CUDA_ENABLED
   require_device(device_id);
   return detail::count_time_window_cycles_johnson_device(
+      pack_graph_for_cuda(graph), device_id, window_width, max_cycle_length);
+#else
+  (void)graph;
+  (void)device_id;
+  throw std::runtime_error("CUDA support is not compiled into this build");
+#endif
+}
+
+CycleHistogram count_temporal_cycles_johnson(
+    const GraphView& graph,
+    const int device_id,
+    const Timestamp window_width,
+    const std::size_t max_cycle_length) {
+  validate_max_cycle_length(max_cycle_length);
+  validate_window_width(window_width);
+
+#if CYCLE_ENUM_CUDA_ENABLED
+  require_device(device_id);
+  return detail::count_temporal_cycles_johnson_device(
       pack_graph_for_cuda(graph), device_id, window_width, max_cycle_length);
 #else
   (void)graph;

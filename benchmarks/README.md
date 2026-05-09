@@ -40,9 +40,10 @@ cmake --build build-bench --target cycle_enum_benchmark_smoke
 ## Cluster Sweep Example
 
 The CUDA backend currently benchmarks bounded Johnson implementations for
-static simple cycles and simple time-window cycles, so `--max-cycle-length` is
-required. On an H100 build configured with `-DCYCLE_ENUM_ENABLE_CUDA=ON
--DCMAKE_CUDA_ARCHITECTURES=90`, a first comparison sweep can be:
+static simple cycles, simple time-window cycles, and temporal cycles, so
+`--max-cycle-length` is required. On an H100 build configured with
+`-DCYCLE_ENUM_ENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=90`, a first comparison
+sweep can be:
 
 ```sh
 python3 benchmarks/run_cycle_benchmarks.py \
@@ -54,6 +55,7 @@ python3 benchmarks/run_cycle_benchmarks.py \
   --algorithm johnson \
   --mode simple \
   --mode simple-time-window \
+  --mode temporal \
   --time-window 3600 \
   --openmp-threads 1 \
   --openmp-threads 16 \
