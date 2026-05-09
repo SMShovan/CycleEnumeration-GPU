@@ -119,6 +119,7 @@ set_target_properties(cycle_enum_cli
 
 target_link_libraries(cycle_enum_cli
   PRIVATE
+    cycle_enum::openmp
     cycle_enum::sequential
 )
 

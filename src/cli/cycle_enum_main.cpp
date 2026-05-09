@@ -2,9 +2,15 @@
 #include "cycle_enum/core/graph_view.hpp"
 #include "cycle_enum/core/options.hpp"
 #include "cycle_enum/core/version.hpp"
+#include "cycle_enum/openmp/openmp_johnson.hpp"
+#include "cycle_enum/openmp/openmp_read_tarjan.hpp"
+#include "cycle_enum/openmp/openmp_temporal_johnson.hpp"
+#include "cycle_enum/openmp/openmp_temporal_read_tarjan.hpp"
 #include "cycle_enum/sequential/bruteforce.hpp"
 #include "cycle_enum/sequential/johnson.hpp"
 #include "cycle_enum/sequential/read_tarjan.hpp"
+#include "cycle_enum/sequential/temporal_johnson.hpp"
+#include "cycle_enum/sequential/temporal_read_tarjan.hpp"
 
 #include <charconv>
 #include <exception>
@@ -17,7 +23,7 @@
 
 /**
  * @file cycle_enum_main.cpp
- * @brief Command-line entry point for exact sequential cycle counting modes.
+ * @brief Command-line entry point for CPU cycle counting modes.
  */
 
 namespace {
@@ -34,9 +40,11 @@ void print_usage(std::ostream& out) {
   out << "Usage: cycle-enum --input <path> [options]\n\n"
       << "Options:\n"
       << "  --algorithm <johnson|read-tarjan|brute-force>\n"
-      << "  --mode <simple|simple-time-window>\n"
+      << "  --backend <sequential|openmp>\n"
+      << "  --mode <simple|simple-time-window|temporal>\n"
       << "  --time-window <positive integer>\n"
       << "  --max-cycle-length <integer >= 2>\n"
+      << "  --openmp-threads <positive integer>\n"
       << "  --help\n"
       << "  --version\n";
 }
@@ -90,6 +98,20 @@ template <typename Integer>
   return std::nullopt;
 }
 
+[[nodiscard]] std::optional<cycle_enum::ExecutionPolicy> parse_execution(
+    const std::string_view value) noexcept {
+  if (value == "sequential" || value == "seq" || value == "cpu") {
+    return cycle_enum::ExecutionPolicy::Sequential;
+  }
+  if (value == "openmp" || value == "omp") {
+    return cycle_enum::ExecutionPolicy::OpenMP;
+  }
+  if (value == "cuda" || value == "gpu") {
+    return cycle_enum::ExecutionPolicy::Cuda;
+  }
+  return std::nullopt;
+}
+
 [[nodiscard]] std::optional<cycle_enum::CycleMode> parse_mode(
     const std::string_view value) noexcept {
   if (value == "simple") {
@@ -99,7 +121,31 @@ template <typename Integer>
       value == "time-window" || value == "window") {
     return cycle_enum::CycleMode::SimpleTimeWindow;
   }
+  if (value == "temporal") {
+    return cycle_enum::CycleMode::Temporal;
+  }
   return std::nullopt;
+}
+
+[[nodiscard]] std::vector<std::string> validate_cli_supported(
+    const cycle_enum::CycleEnumerationOptions& options) {
+  std::vector<std::string> errors;
+
+  if (options.execution == cycle_enum::ExecutionPolicy::Cuda) {
+    errors.emplace_back("cuda backend is not implemented in the CLI yet");
+  }
+
+  if (options.execution == cycle_enum::ExecutionPolicy::OpenMP) {
+    if (options.algorithm == cycle_enum::AlgorithmFamily::BruteForce) {
+      errors.emplace_back("brute-force is only available with sequential backend");
+    }
+    if (options.mode == cycle_enum::CycleMode::SimpleTimeWindow) {
+      errors.emplace_back(
+          "openmp backend does not implement simple-time-window mode yet");
+    }
+  }
+
+  return errors;
 }
 
 [[nodiscard]] std::optional<CliConfig> parse_args(int argc,
@@ -149,6 +195,21 @@ template <typename Integer>
       continue;
     }
 
+    if (option == "--backend" || option == "--execution" ||
+        option == "--policy") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto execution = parse_execution(*value);
+      if (!execution.has_value()) {
+        err << "unknown backend: " << *value << '\n';
+        return std::nullopt;
+      }
+      config.options.execution = *execution;
+      continue;
+    }
+
     if (option == "--mode" || option == "-m") {
       const auto value = next_value(args, index, option, err);
       if (!value.has_value()) {
@@ -160,6 +221,19 @@ template <typename Integer>
         return std::nullopt;
       }
       config.options.mode = *mode;
+      continue;
+    }
+
+    if (option == "--openmp-threads" || option == "--threads") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<int>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.options.openmp_threads = *parsed;
       continue;
     }
 
@@ -208,8 +282,12 @@ template <typename Integer>
     return std::nullopt;
   }
 
-  if (config.options.mode == cycle_enum::CycleMode::Temporal) {
-    err << "temporal mode is not implemented in the sequential CLI yet\n";
+  const std::vector<std::string> cli_errors =
+      validate_cli_supported(config.options);
+  if (!cli_errors.empty()) {
+    for (const std::string& error : cli_errors) {
+      err << error << '\n';
+    }
     return std::nullopt;
   }
 
@@ -249,17 +327,82 @@ template <typename Integer>
       break;
 
     case cycle_enum::CycleMode::Temporal:
+      switch (options.algorithm) {
+        case cycle_enum::AlgorithmFamily::Johnson:
+          return cycle_enum::sequential::count_temporal_cycles_johnson(
+              graph, *options.time_window, options.max_cycle_length);
+        case cycle_enum::AlgorithmFamily::ReadTarjan:
+          return cycle_enum::sequential::count_temporal_cycles_read_tarjan(
+              graph, *options.time_window, options.max_cycle_length);
+        case cycle_enum::AlgorithmFamily::BruteForce:
+          return cycle_enum::sequential::count_temporal_cycles_bruteforce(
+              graph, *options.time_window, options.max_cycle_length);
+      }
       break;
   }
 
   throw std::logic_error("unsupported sequential cycle counting mode");
 }
 
+[[nodiscard]] cycle_enum::CycleHistogram run_openmp(
+    const cycle_enum::GraphView& graph,
+    const cycle_enum::CycleEnumerationOptions& options) {
+  switch (options.mode) {
+    case cycle_enum::CycleMode::Simple:
+      switch (options.algorithm) {
+        case cycle_enum::AlgorithmFamily::Johnson:
+          return cycle_enum::openmp::count_simple_cycles_johnson(
+              graph, options.openmp_threads, options.max_cycle_length);
+        case cycle_enum::AlgorithmFamily::ReadTarjan:
+          return cycle_enum::openmp::count_simple_cycles_read_tarjan(
+              graph, options.openmp_threads, options.max_cycle_length);
+        case cycle_enum::AlgorithmFamily::BruteForce:
+          break;
+      }
+      break;
+
+    case cycle_enum::CycleMode::Temporal:
+      switch (options.algorithm) {
+        case cycle_enum::AlgorithmFamily::Johnson:
+          return cycle_enum::openmp::count_temporal_cycles_johnson(
+              graph, *options.time_window, options.openmp_threads,
+              options.max_cycle_length);
+        case cycle_enum::AlgorithmFamily::ReadTarjan:
+          return cycle_enum::openmp::count_temporal_cycles_read_tarjan(
+              graph, *options.time_window, options.openmp_threads,
+              options.max_cycle_length);
+        case cycle_enum::AlgorithmFamily::BruteForce:
+          break;
+      }
+      break;
+
+    case cycle_enum::CycleMode::SimpleTimeWindow:
+      break;
+  }
+
+  throw std::logic_error("unsupported OpenMP cycle counting mode");
+}
+
+[[nodiscard]] cycle_enum::CycleHistogram run_backend(
+    const cycle_enum::GraphView& graph,
+    const cycle_enum::CycleEnumerationOptions& options) {
+  switch (options.execution) {
+    case cycle_enum::ExecutionPolicy::Sequential:
+      return run_sequential(graph, options);
+    case cycle_enum::ExecutionPolicy::OpenMP:
+      return run_openmp(graph, options);
+    case cycle_enum::ExecutionPolicy::Cuda:
+      break;
+  }
+
+  throw std::logic_error("unsupported execution backend");
+}
+
 }  // namespace
 
 /**
- * @brief Parse CLI arguments, run the requested sequential counter, and print
- * the cycle histogram.
+ * @brief Parse CLI arguments, run the requested CPU counter, and print the
+ * cycle histogram.
  */
 int main(int argc, char** argv) {
   const std::optional<CliConfig> config = parse_args(argc, argv, std::cerr);
@@ -283,7 +426,7 @@ int main(int argc, char** argv) {
         cycle_enum::read_temporal_graph(config->input_path);
     const cycle_enum::GraphView view = cycle_enum::build_graph_view(parsed);
     const cycle_enum::CycleHistogram histogram =
-        run_sequential(view, config->options);
+        run_backend(view, config->options);
     std::cout << histogram.to_csv();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';

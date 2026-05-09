@@ -126,6 +126,10 @@ intended to preserve enough technical context for a later project report.
   timestamp-by-timestamp expansion semantics, adds thread-local instrumentation
   for DFS states, closing-time prunes, and timestamp extensions, and merges
   histograms after the root-parallel search.
+- Extended the CLI to select `--backend sequential|openmp`, set
+  `--openmp-threads`, and run sequential or OpenMP simple/temporal Johnson and
+  Read-Tarjan counters. Unsupported backend and mode combinations now fail with
+  explicit messages so benchmark scripts do not silently use the wrong backend.
 
 ### Notes
 

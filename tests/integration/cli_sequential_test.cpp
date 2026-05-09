@@ -112,6 +112,75 @@ TEST(CliSequentialTest, RunsReadTarjanSimpleMode) {
                     "Total, 1\n");
 }
 
+TEST(CliSequentialTest, RunsTemporalMode) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "temporal",
+          "--time-window",
+          "10",
+      },
+      status);
+
+  EXPECT_EQ(status, 0);
+  EXPECT_EQ(output, "# cycle_size, num_of_cycles\n"
+                    "2, 2\n"
+                    "Total, 2\n");
+}
+
+TEST(CliOpenMPTest, RunsOpenMPSimpleModeWithSingleThread) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "openmp",
+          "--openmp-threads",
+          "1",
+          "--algorithm",
+          "read-tarjan",
+          "--mode",
+          "simple",
+      },
+      status);
+
+  EXPECT_EQ(status, 0);
+  EXPECT_EQ(output, "# cycle_size, num_of_cycles\n"
+                    "2, 1\n"
+                    "Total, 1\n");
+}
+
+TEST(CliOpenMPTest, RunsOpenMPTemporalModeWithSingleThread) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "openmp",
+          "--openmp-threads",
+          "1",
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "temporal",
+          "--time-window",
+          "10",
+      },
+      status);
+
+  EXPECT_EQ(status, 0);
+  EXPECT_EQ(output, "# cycle_size, num_of_cycles\n"
+                    "2, 2\n"
+                    "Total, 2\n");
+}
+
 TEST(CliSequentialTest, RejectsMissingTimeWindow) {
   int status = -1;
   const std::string output = run_cli(
@@ -125,6 +194,25 @@ TEST(CliSequentialTest, RejectsMissingTimeWindow) {
 
   EXPECT_NE(status, 0);
   EXPECT_NE(output.find("time_window is required"), std::string::npos);
+}
+
+TEST(CliOpenMPTest, RejectsUnsupportedTimeWindowMode) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("reference_sample.txt"),
+          "--backend",
+          "openmp",
+          "--mode",
+          "simple-time-window",
+          "--time-window",
+          "3600",
+      },
+      status);
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("openmp backend does not implement"), std::string::npos);
 }
 
 }  // namespace
