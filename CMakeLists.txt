@@ -49,6 +49,7 @@ cycle_enum_configure_sanitizers(cycle_enum_core)
 
 add_library(cycle_enum_sequential
   src/sequential/bruteforce.cpp
+  src/sequential/johnson.cpp
 )
 
 add_library(cycle_enum::sequential ALIAS cycle_enum_sequential)

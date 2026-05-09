@@ -55,6 +55,11 @@ intended to preserve enough technical context for a later project report.
   directed cycles while counting each cycle once by requiring the root to be the
   smallest compact vertex in the cycle. This oracle is intended for correctness
   tests of Johnson, Read-Tarjan, OpenMP, and CUDA implementations.
+- Added a sequential Johnson simple-cycle counter for static directed graphs.
+  The implementation uses blocked-set and blocked-list pruning, counts each
+  directed cycle once using the smallest compact vertex as root, and is tested
+  against the brute-force oracle on acyclic, single-cycle, and overlapping-cycle
+  fixtures.
 
 ### Notes
 
