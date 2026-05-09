@@ -135,6 +135,10 @@ intended to preserve enough technical context for a later project report.
   machines compile a clear unavailable backend, while CUDA builds enable the
   CUDA language, link `cudart`, and default to the H100-oriented `sm_90`
   architecture unless overridden.
+- Added a host-side CUDA graph packer that converts the shared CSR/CSC
+  `GraphView` into fixed-width arrays for later device allocation. The layout
+  keeps 32-bit vertex/edge ids but uses 64-bit offsets so timestamp-heavy
+  temporal graphs remain representable on the GPU path.
 
 ### Notes
 

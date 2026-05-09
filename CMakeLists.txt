@@ -171,6 +171,7 @@ endif()
 
 add_library(cycle_enum_cuda
   src/cuda/cuda_config.cpp
+  src/cuda/cuda_graph.cpp
 )
 
 add_library(cycle_enum::cuda ALIAS cycle_enum_cuda)

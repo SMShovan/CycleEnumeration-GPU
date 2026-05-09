@@ -1,0 +1,56 @@
+#pragma once
+
+#include "cycle_enum/core/graph_view.hpp"
+
+#include <cstdint>
+#include <vector>
+
+/**
+ * @file cuda_graph.hpp
+ * @brief Host-side graph packing for CUDA kernels.
+ */
+
+namespace cycle_enum::cuda {
+
+/**
+ * @brief Offset type used in device-facing CSR and timestamp arrays.
+ *
+ * Vertex and edge ids stay compact 32-bit values, but offsets use 64 bits so a
+ * graph with many timestamped edge events can still be represented safely.
+ */
+using DeviceOffset = std::uint64_t;
+
+/**
+ * @brief Adjacency entry layout copied to CUDA kernels.
+ */
+struct CudaAdjacencyEntry {
+  VertexId vertex = 0; ///< Neighbor vertex id.
+  EdgeId edge_id = 0; ///< Logical edge id from the host graph.
+  DeviceOffset timestamp_begin = 0; ///< Inclusive timestamp offset.
+  DeviceOffset timestamp_end = 0; ///< Exclusive timestamp offset.
+};
+
+/**
+ * @brief Host-owned packed graph arrays ready for device allocation.
+ *
+ * The layout mirrors `GraphView` while replacing host `std::size_t` offsets
+ * with a fixed-width type. Later CUDA phases can copy these arrays to device
+ * memory without depending on platform-specific host pointer sizes.
+ */
+struct CudaGraphData {
+  DeviceOffset vertex_count = 0; ///< Number of compact vertices.
+  DeviceOffset edge_count = 0; ///< Number of logical directed edges.
+  DeviceOffset timestamp_count = 0; ///< Number of timestamped edge events.
+  std::vector<DeviceOffset> outgoing_offsets; ///< CSR outgoing offsets.
+  std::vector<CudaAdjacencyEntry> outgoing_edges; ///< CSR adjacency entries.
+  std::vector<DeviceOffset> incoming_offsets; ///< CSC incoming offsets.
+  std::vector<CudaAdjacencyEntry> incoming_edges; ///< CSC adjacency entries.
+  std::vector<Timestamp> timestamps; ///< Flat timestamp storage.
+};
+
+/**
+ * @brief Convert a `GraphView` to CUDA-facing packed arrays.
+ */
+[[nodiscard]] CudaGraphData pack_graph_for_cuda(const GraphView& graph);
+
+}  // namespace cycle_enum::cuda
