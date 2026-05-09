@@ -25,6 +25,9 @@ intended to preserve enough technical context for a later project report.
 - Added Google Test and CTest wiring with a smoke test for the compiled project
   version. This creates the validation path that later parser, algorithm, and
   CUDA work will use.
+- Added optional Doxygen wiring and a project Doxyfile template. Public headers
+  can now grow API documentation as the graph, CPU, OpenMP, and CUDA modules
+  are implemented.
 
 ### Notes
 

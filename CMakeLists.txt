@@ -10,6 +10,7 @@ project(
 include(GNUInstallDirs)
 include(cmake/CycleEnumOptions.cmake)
 include(cmake/Sanitizers.cmake)
+include(cmake/Doxygen.cmake)
 
 add_library(cycle_enum_core
   src/core/version.cpp
@@ -53,6 +54,4 @@ if(CYCLE_ENUM_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-if(CYCLE_ENUM_ENABLE_DOXYGEN)
-  message(STATUS "Doxygen option is enabled; documentation targets will be added in the Doxygen setup phase.")
-endif()
+cycle_enum_configure_doxygen()
