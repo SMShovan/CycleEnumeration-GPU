@@ -82,6 +82,9 @@ intended to preserve enough technical context for a later project report.
   instances by requiring strictly increasing edge timestamps within the start
   edge's window, which gives later optimized temporal implementations a small
   but exact validator.
+- Added a naive sequential temporal Johnson counter. This version keeps a
+  per-start-edge timestamp DFS with explicit visited/path state and validates
+  against the temporal brute-force oracle before later closing-time pruning.
 
 ### Notes
 
