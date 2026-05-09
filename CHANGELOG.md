@@ -97,6 +97,10 @@ intended to preserve enough technical context for a later project report.
   start-edge timestamp work items with local visited/path state, conservative
   temporal reachability pruning, and parity tests against both the temporal
   brute-force oracle and temporal Johnson.
+- Added sequential temporal cycle-union preprocessing. The first version
+  computes a conservative forward/reverse reachability intersection inside a
+  start edge's window, with tests for dead-branch removal, window handling, and
+  invalid requests.
 
 ### Notes
 

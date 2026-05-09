@@ -49,6 +49,7 @@ cycle_enum_configure_sanitizers(cycle_enum_core)
 
 add_library(cycle_enum_sequential
   src/sequential/bruteforce.cpp
+  src/sequential/cycle_union.cpp
   src/sequential/johnson.cpp
   src/sequential/read_tarjan.cpp
   src/sequential/temporal_johnson.cpp
