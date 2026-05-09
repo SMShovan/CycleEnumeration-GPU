@@ -50,9 +50,9 @@ endif()
 
 if(CYCLE_ENUM_BUILD_TESTS)
   enable_testing()
+  add_subdirectory(tests)
 endif()
 
 if(CYCLE_ENUM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen option is enabled; documentation targets will be added in the Doxygen setup phase.")
 endif()
-

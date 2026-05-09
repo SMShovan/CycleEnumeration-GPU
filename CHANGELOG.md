@@ -22,6 +22,9 @@ intended to preserve enough technical context for a later project report.
   benchmarks, OpenMP, CUDA, Doxygen, and sanitizers.
 - Added a small core library target with version helpers so future CLI and
   benchmark output can record the exact project build version.
+- Added Google Test and CTest wiring with a smoke test for the compiled project
+  version. This creates the validation path that later parser, algorithm, and
+  CUDA work will use.
 
 ### Notes
 
