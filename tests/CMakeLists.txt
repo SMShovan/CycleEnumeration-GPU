@@ -20,6 +20,7 @@ add_executable(cycle_enum_core_test
   unit/options_test.cpp
   unit/result_test.cpp
   unit/smoke_test.cpp
+  unit/timestamp_test.cpp
 )
 
 target_link_libraries(cycle_enum_core_test

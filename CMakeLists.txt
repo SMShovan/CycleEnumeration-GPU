@@ -18,6 +18,7 @@ add_library(cycle_enum_core
   src/core/histogram.cpp
   src/core/options.cpp
   src/core/result.cpp
+  src/core/timestamp.cpp
   src/core/version.cpp
 )
 

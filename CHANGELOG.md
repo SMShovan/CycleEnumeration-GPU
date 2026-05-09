@@ -47,6 +47,10 @@ intended to preserve enough technical context for a later project report.
   supports forward traversal, the incoming view supports reverse reachability
   and future cycle-union preprocessing, and shared timestamp ranges keep both
   views consistent for CPU and CUDA transfer planning.
+- Added host timestamp interval helpers for inclusive time-window lookup,
+  strictly-after-start lookup, and temporal increasing-order lookup. These
+  helpers define the boundary semantics that CPU and CUDA algorithms will need
+  to match.
 
 ### Notes
 
