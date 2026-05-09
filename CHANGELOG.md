@@ -130,6 +130,11 @@ intended to preserve enough technical context for a later project report.
   `--openmp-threads`, and run sequential or OpenMP simple/temporal Johnson and
   Read-Tarjan counters. Unsupported backend and mode combinations now fail with
   explicit messages so benchmark scripts do not silently use the wrong backend.
+- Added the initial CUDA build scaffold. The project now always exposes a
+  `cycle_enum::cuda` target with host-side availability queries; non-CUDA
+  machines compile a clear unavailable backend, while CUDA builds enable the
+  CUDA language, link `cudart`, and default to the H100-oriented `sm_90`
+  architecture unless overridden.
 
 ### Notes
 

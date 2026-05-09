@@ -27,13 +27,14 @@ focused on CPU threading and one-GPU execution.
 ## Current Status
 
 The repository has the foundation, temporal graph parser, CSR/CSC graph view,
-histogram utilities, timestamp helpers, and exact sequential simple-cycle
-counters. Sequential Johnson and Read-Tarjan modes are available through the
-`cycle-enum` command-line driver for static simple cycles and simple
-time-window counting.
+histogram utilities, timestamp helpers, exact sequential counters, and OpenMP
+CPU baselines. The `cycle-enum` command-line driver can run sequential and
+OpenMP static simple-cycle counters plus temporal Johnson and Read-Tarjan
+counters.
 
-OpenMP runtime detection is wired into the build, but parallel OpenMP counters
-will be added in the next implementation steps.
+CUDA runtime detection is wired into the build as an optional target. On
+non-CUDA machines it compiles as an unavailable backend; on NVIDIA systems,
+`CYCLE_ENUM_ENABLE_CUDA=ON` enables CUDA language support and links the runtime.
 
 ## Build and Run
 
@@ -41,6 +42,16 @@ will be added in the next implementation steps.
 cmake -S . -B build -DCYCLE_ENUM_BUILD_TESTS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
+```
+
+CUDA configuration for an H100-class cluster can start with:
+
+```sh
+cmake -S . -B build-cuda \
+  -DCYCLE_ENUM_BUILD_TESTS=ON \
+  -DCYCLE_ENUM_ENABLE_CUDA=ON \
+  -DCMAKE_CUDA_ARCHITECTURES=90
+cmake --build build-cuda
 ```
 
 Example sequential run:

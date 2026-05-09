@@ -28,6 +28,7 @@ add_executable(cycle_enum_core_test
   integration/temporal_johnson_test.cpp
   integration/temporal_read_tarjan_test.cpp
   unit/bruteforce_test.cpp
+  unit/cuda_config_test.cpp
   unit/cycle_union_test.cpp
   unit/graph_parser_test.cpp
   unit/graph_view_test.cpp
@@ -42,6 +43,7 @@ add_executable(cycle_enum_core_test
 
 target_link_libraries(cycle_enum_core_test
   PRIVATE
+    cycle_enum::cuda
     cycle_enum::sequential
     cycle_enum::openmp
     GTest::gtest_main

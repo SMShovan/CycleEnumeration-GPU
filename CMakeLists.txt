@@ -8,6 +8,7 @@ project(
 )
 
 include(GNUInstallDirs)
+include(CheckLanguage)
 include(cmake/CycleEnumOptions.cmake)
 include(cmake/Sanitizers.cmake)
 include(cmake/Doxygen.cmake)
@@ -152,9 +153,62 @@ target_compile_definitions(cycle_enum_openmp
 
 cycle_enum_configure_sanitizers(cycle_enum_openmp)
 
+set(CYCLE_ENUM_CUDA_AVAILABLE OFF)
 if(CYCLE_ENUM_ENABLE_CUDA)
-  message(STATUS "CUDA option is enabled; CUDA targets will be added with the CUDA infrastructure phase.")
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    set(CYCLE_ENUM_CUDA_AVAILABLE ON)
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+      set(CMAKE_CUDA_ARCHITECTURES 90)
+    endif()
+    message(STATUS "CUDA support enabled for architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+  else()
+    message(WARNING "CUDA was requested but no CUDA compiler was found; CUDA backends will report unavailable.")
+  endif()
 endif()
+
+add_library(cycle_enum_cuda
+  src/cuda/cuda_config.cpp
+)
+
+add_library(cycle_enum::cuda ALIAS cycle_enum_cuda)
+
+target_link_libraries(cycle_enum_cuda
+  PUBLIC
+    cycle_enum::core
+)
+
+target_compile_features(cycle_enum_cuda PUBLIC cxx_std_17)
+
+target_include_directories(cycle_enum_cuda
+  PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+target_compile_definitions(cycle_enum_cuda
+  PUBLIC
+    CYCLE_ENUM_CUDA_ENABLED=$<BOOL:${CYCLE_ENUM_CUDA_AVAILABLE}>
+)
+
+if(CYCLE_ENUM_CUDA_AVAILABLE)
+  target_link_libraries(cycle_enum_cuda PUBLIC CUDA::cudart)
+  set_target_properties(cycle_enum_cuda
+    PROPERTIES
+      CUDA_STANDARD 17
+      CUDA_STANDARD_REQUIRED ON
+  )
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(cycle_enum_cuda PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+  target_compile_options(cycle_enum_cuda PRIVATE /W4)
+endif()
+
+cycle_enum_configure_sanitizers(cycle_enum_cuda)
 
 if(CYCLE_ENUM_BUILD_TESTS)
   enable_testing()
