@@ -1,0 +1,49 @@
+# macOS and editor metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local planning notes that are not part of the public repository
+PROJECT_PLAN.md
+
+# Build outputs
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+_deps/
+
+# Binaries and libraries
+*.a
+*.dylib
+*.so
+*.dll
+*.exe
+*.out
+
+# Test, coverage, and sanitizer output
+coverage/
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+asan.log*
+ubsan.log*
+
+# Documentation output
+docs/doxygen/html/
+docs/doxygen/latex/
+
+# Benchmark and profiling artifacts
+benchmarks/results/
+*.nsys-rep
+*.qdrep
+*.nvvp
+*.ncu-rep
+
