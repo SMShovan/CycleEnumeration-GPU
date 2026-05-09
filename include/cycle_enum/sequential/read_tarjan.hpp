@@ -30,5 +30,15 @@ namespace cycle_enum::sequential {
     const GraphView& graph,
     std::optional<std::size_t> max_cycle_length = std::nullopt);
 
-}  // namespace cycle_enum::sequential
+/**
+ * @brief Count simple cycles under a start-edge time-window constraint.
+ *
+ * This variant follows the same timestamp boundary convention as the
+ * baseline-compatible Johnson time-window implementation.
+ */
+[[nodiscard]] CycleHistogram count_time_window_cycles_read_tarjan(
+    const GraphView& graph,
+    Timestamp window_width,
+    std::optional<std::size_t> max_cycle_length = std::nullopt);
 
+}  // namespace cycle_enum::sequential

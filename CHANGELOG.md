@@ -71,6 +71,9 @@ intended to preserve enough technical context for a later project report.
   path-extension search. The implementation is validated against the brute-force
   oracle on acyclic, single-cycle, overlapping-cycle, and maximum-length
   fixtures.
+- Added sequential Read-Tarjan support for start-edge time-window counting.
+  The implementation shares the baseline-compatible timestamp convention used
+  by the Johnson time-window path and is checked against the brute-force oracle.
 
 ### Notes
 
