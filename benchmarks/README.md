@@ -39,6 +39,12 @@ cmake --build build-bench --target cycle_enum_benchmark_smoke
 
 ## Cluster Sweep Example
 
+For an allocated H100 node, `scripts/h100_smoke.sh` configures a CUDA/OpenMP
+build, runs CTest, and writes a small CPU/GPU benchmark CSV. Environment
+variables such as `BUILD_DIR`, `JOBS`, `OPENMP_THREADS`, `CUDA_DEVICE`,
+`MAX_CYCLE_LENGTH`, `TIME_WINDOW`, `SAMPLE_INPUT`, and `BENCHMARK_OUTPUT` can
+override the defaults.
+
 The CUDA backend currently benchmarks bounded Johnson implementations for
 static simple cycles, simple time-window cycles, and temporal cycles, so
 `--max-cycle-length` is required. On an H100 build configured with

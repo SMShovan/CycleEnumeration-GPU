@@ -169,6 +169,9 @@ intended to preserve enough technical context for a later project report.
   Threads now accumulate cycle-length counts inside a block and flush one
   value per length to global memory, reducing global atomic contention for
   cycle-heavy graphs.
+- Added an H100 cluster smoke script. It configures CUDA/OpenMP for `sm_90`,
+  builds, runs CTest, and records a small sequential/OpenMP/CUDA Johnson
+  benchmark CSV so cluster bring-up has a repeatable first command.
 
 ### Notes
 

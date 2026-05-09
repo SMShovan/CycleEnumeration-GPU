@@ -55,6 +55,12 @@ cmake -S . -B build-cuda \
 cmake --build build-cuda
 ```
 
+For a one-command cluster smoke run on an allocated H100 node:
+
+```sh
+scripts/h100_smoke.sh
+```
+
 Example sequential run:
 
 ```sh
