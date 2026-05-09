@@ -172,6 +172,7 @@ endif()
 add_library(cycle_enum_cuda
   src/cuda/cuda_config.cpp
   src/cuda/cuda_graph.cpp
+  src/cuda/cuda_johnson.cpp
 )
 
 add_library(cycle_enum::cuda ALIAS cycle_enum_cuda)
@@ -195,6 +196,10 @@ target_compile_definitions(cycle_enum_cuda
 )
 
 if(CYCLE_ENUM_CUDA_AVAILABLE)
+  target_sources(cycle_enum_cuda
+    PRIVATE
+      src/cuda/cuda_johnson_kernel.cu
+  )
   target_link_libraries(cycle_enum_cuda PUBLIC CUDA::cudart)
   set_target_properties(cycle_enum_cuda
     PROPERTIES

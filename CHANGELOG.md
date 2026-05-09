@@ -139,6 +139,11 @@ intended to preserve enough technical context for a later project report.
   `GraphView` into fixed-width arrays for later device allocation. The layout
   keeps 32-bit vertex/edge ids but uses 64-bit offsets so timestamp-heavy
   temporal graphs remain representable on the GPU path.
+- Added the first naive CUDA static Johnson counter. The CUDA build compiles a
+  one-root-per-thread kernel with a bounded per-thread DFS stack and a global
+  cycle-length histogram; non-CUDA builds expose the same API but fail clearly
+  before dispatch. This is a correctness-oriented GPU baseline for later work
+  on work queues, occupancy, and reduced atomic contention.
 
 ### Notes
 
