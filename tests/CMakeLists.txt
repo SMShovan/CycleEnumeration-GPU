@@ -14,6 +14,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(cycle_enum_core_test
+  unit/graph_parser_test.cpp
   unit/histogram_test.cpp
   unit/options_test.cpp
   unit/result_test.cpp
@@ -24,6 +25,11 @@ target_link_libraries(cycle_enum_core_test
   PRIVATE
     cycle_enum::core
     GTest::gtest_main
+)
+
+target_compile_definitions(cycle_enum_core_test
+  PRIVATE
+    CYCLE_ENUM_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data"
 )
 
 include(GoogleTest)

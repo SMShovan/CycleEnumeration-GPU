@@ -38,6 +38,11 @@ intended to preserve enough technical context for a later project report.
   total-count reporting, and overflow checks. This will be the shared result
   container for correctness tests, CLI output, benchmark logs, and baseline
   comparisons.
+- Added temporal graph parsing for `source target timestamp` input. The parser
+  skips comments and self-loops, compacts external vertex ids, groups duplicate
+  directed edges, preserves duplicate timestamps, and sorts timestamp lists.
+- Added parser tests for comments, duplicate edge grouping, timestamp sorting,
+  self-loop skipping, missing files, malformed rows, and vertex-id compaction.
 
 ### Notes
 
