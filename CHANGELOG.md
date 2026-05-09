@@ -114,6 +114,9 @@ intended to preserve enough technical context for a later project report.
 - Added the first OpenMP Johnson baseline for static simple cycles. The
   implementation splits work by root vertex, uses thread-local histograms, and
   falls back to a single-thread path when OpenMP is unavailable.
+- Added the OpenMP Read-Tarjan static baseline using the same root-level work
+  partitioning and thread-local histogram merge strategy, with parity tests
+  against the sequential Read-Tarjan counter.
 
 ### Notes
 
