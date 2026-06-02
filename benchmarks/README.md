@@ -100,6 +100,40 @@ python3 benchmarks/run_cycle_benchmarks.py \
   --output benchmarks/results/h100-static-johnson.csv
 ```
 
+## Matrix Runner and Analysis
+
+`scripts/run_benchmarks.sh` runs a configurable matrix (datasets x backends x
+algorithms x modes x thread counts) into one CSV, failing fast if a dataset path
+is missing:
+
+```sh
+DATASETS="benchmarks/data/graph-a.txt benchmarks/data/graph-b.txt" \
+BACKENDS="sequential openmp cuda" \
+MODES="simple temporal" \
+OUTPUT=benchmarks/results/matrix.csv \
+benchmarks/scripts/run_benchmarks.sh
+```
+
+`scripts/collect_results.py` aggregates one or more result CSVs into a
+per-configuration summary with run count and min/median/mean elapsed time:
+
+```sh
+python3 benchmarks/scripts/collect_results.py benchmarks/results/matrix.csv
+```
+
+`scripts/plot_results.py` computes speedup relative to the single-thread
+sequential baseline of the same input, algorithm, and mode, and writes runtime
+bar charts when matplotlib is available:
+
+```sh
+python3 benchmarks/scripts/plot_results.py benchmarks/results/matrix.csv \
+  --output benchmarks/results/speedup.csv \
+  --plot-dir benchmarks/results/plots
+```
+
+The total cycle count travels through every summary so a configuration that
+changes the answer is caught next to its timing.
+
 ## TBB Baseline Example
 
 After building the baseline repository, pass its `cycle` executable with one or

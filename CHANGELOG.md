@@ -255,6 +255,11 @@ intended to preserve enough technical context for a later project report.
   into one CSV, and an aggregation script groups the measured rows per
   configuration and reports run count, min, median, and mean elapsed time with a
   total-cycle column. Both were exercised against real harness output.
+- Added a benchmark analysis script. It derives speedup relative to the
+  single-thread sequential baseline of the same input, algorithm, and mode, and
+  writes runtime bar charts when matplotlib is available while always producing
+  the speedup table so it works on a bare cluster allocation. The benchmark
+  README documents the matrix runner, the aggregator, and the analysis script.
 
 ### Notes
 
