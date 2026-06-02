@@ -18,6 +18,7 @@ add_executable(cycle_enum_core_test
   integration/johnson_time_window_test.cpp
   integration/openmp_johnson_test.cpp
   integration/openmp_read_tarjan_test.cpp
+  integration/openmp_task_parity_test.cpp
   integration/openmp_temporal_johnson_test.cpp
   integration/openmp_temporal_read_tarjan_test.cpp
   integration/path_bundling_test.cpp

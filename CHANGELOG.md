@@ -172,6 +172,13 @@ intended to preserve enough technical context for a later project report.
 - Added an H100 cluster smoke script. It configures CUDA/OpenMP for `sm_90`,
   builds, runs CTest, and records a small sequential/OpenMP/CUDA Johnson
   benchmark CSV so cluster bring-up has a repeatable first command.
+- Added a fine-grained OpenMP Read-Tarjan task experiment. It spawns one task
+  per path prefix up to a configurable cutoff depth, copies path and visited
+  state into each task in a copy-on-steal style, and finishes each subtree
+  serially. The variant is a measurable comparison point against the
+  coarse-grained baseline, not the primary CPU implementation, and is validated
+  for histogram parity against the sequential and coarse-grained Read-Tarjan
+  counters across thread counts and cutoff depths.
 
 ### Notes
 
