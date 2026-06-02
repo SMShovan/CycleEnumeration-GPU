@@ -270,6 +270,10 @@ intended to preserve enough technical context for a later project report.
   modes, algorithm families, and execution backends, lists the CMake build
   options, and gives sequential, OpenMP, and CUDA CLI examples, and the status
   summary reflects the CUDA optimization work.
+- Completed the Doxygen module documentation. A modules page documents the core,
+  sequential, OpenMP, and CUDA namespaces and an architecture overview, and the
+  Doxyfile now includes the module page and the design notes so the generated
+  site has navigable module pages. The HTML was generated locally without errors.
 
 ### Notes
 

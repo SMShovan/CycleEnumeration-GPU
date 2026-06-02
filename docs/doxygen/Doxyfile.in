@@ -9,9 +9,11 @@ OUTPUT_LANGUAGE        = English
 
 INPUT                  = "@PROJECT_SOURCE_DIR@/include" \
                          "@PROJECT_SOURCE_DIR@/src" \
+                         "@PROJECT_SOURCE_DIR@/docs/doxygen/modules.dox" \
+                         "@PROJECT_SOURCE_DIR@/docs/design" \
                          "@PROJECT_SOURCE_DIR@/README.md"
 RECURSIVE              = YES
-FILE_PATTERNS          = *.hpp *.cpp *.cuh *.cu *.md
+FILE_PATTERNS          = *.hpp *.cpp *.cuh *.cu *.md *.dox
 USE_MDFILE_AS_MAINPAGE = "@PROJECT_SOURCE_DIR@/README.md"
 
 EXTRACT_ALL            = NO

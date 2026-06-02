@@ -1,0 +1,58 @@
+/**
+ * @namespace cycle_enum
+ * @brief Core data model shared by every backend.
+ *
+ * Holds the temporal graph parser, the CSR/CSC `GraphView`, the cycle
+ * histogram, timestamp interval helpers, and the option and result types. Every
+ * sequential, OpenMP, and CUDA counter consumes these types.
+ */
+
+/**
+ * @namespace cycle_enum::sequential
+ * @brief Single-threaded reference counters and the brute-force oracle.
+ *
+ * Provides exact Johnson and Read-Tarjan counters for simple, time-window, and
+ * temporal cycles, temporal cycle-union preprocessing, and the brute-force
+ * oracle used to validate every other implementation.
+ */
+
+/**
+ * @namespace cycle_enum::openmp
+ * @brief OpenMP CPU-parallel counters.
+ *
+ * Coarse-grained Johnson and Read-Tarjan counters for simple and temporal
+ * cycles, plus a fine-grained Read-Tarjan task experiment. All fall back to the
+ * sequential search when no OpenMP runtime is linked.
+ */
+
+/**
+ * @namespace cycle_enum::cuda
+ * @brief Single-GPU CUDA counters and their host-side support.
+ *
+ * Contains the device kernels and the host-side building blocks they consume:
+ * the structure-of-arrays graph packing, start-event generation and cycle-union
+ * prefiltering, branch-split decomposition, timestamp grouping, the persistent
+ * work-queue scheduler and its launch planner, bitset visited sets, and NVTX
+ * profiling ranges. Host-side logic is unit tested; kernels are validated on the
+ * GPU.
+ */
+
+/**
+ * @page architecture Architecture Overview
+ *
+ * CycleEnumeration-GPU is layered so each backend is validated against the one
+ * below it:
+ *
+ * - The core module (`cycle_enum`) defines the graph, histogram, and option
+ *   types.
+ * - The sequential module (`cycle_enum::sequential`) gives exact reference
+ *   results and the brute-force oracle.
+ * - The OpenMP module (`cycle_enum::openmp`) adds CPU parallelism, checked
+ *   against the sequential counters.
+ * - The CUDA module (`cycle_enum::cuda`) adds single-GPU counters and
+ *   GPU-friendly host preprocessing, checked against the sequential counters on
+ *   the cluster.
+ *
+ * The design notes under `docs/design/` describe each algorithm and the CUDA
+ * optimization strategy in detail.
+ */
