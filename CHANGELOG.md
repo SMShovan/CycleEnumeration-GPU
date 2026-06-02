@@ -183,6 +183,13 @@ intended to preserve enough technical context for a later project report.
   build and drives the benchmark harness across a thread-count sweep for the
   sequential and OpenMP backends, so per-algorithm runtime and thread scaling
   can be recorded in one CSV without CUDA.
+- Added a host-side CUDA start-event generator and temporal cycle-union
+  prefilter. Start events are built once on the host, and the temporal dispatch
+  drops start edges whose cycle-union set is empty before launching the kernel.
+  The prefilter is correctness preserving and unit tested against an independent
+  temporal-reachability reference, so it never removes a start edge that can
+  close a cycle. The naive time-window and temporal kernels now consume the
+  host-built events instead of regenerating them on the device.
 
 ### Notes
 

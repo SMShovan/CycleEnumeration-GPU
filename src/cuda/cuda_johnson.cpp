@@ -2,8 +2,10 @@
 
 #include "cycle_enum/cuda/cuda_config.hpp"
 #include "cycle_enum/cuda/cuda_graph.hpp"
+#include "cycle_enum/cuda/cuda_work_item.hpp"
 
 #include <stdexcept>
+#include <vector>
 
 /**
  * @file cuda_johnson.cpp
@@ -48,13 +50,15 @@ namespace detail {
     const CudaGraphData& graph,
     int device_id,
     Timestamp window_width,
-    std::size_t max_cycle_length);
+    std::size_t max_cycle_length,
+    const std::vector<CudaStartEvent>& start_events);
 
 [[nodiscard]] CycleHistogram count_temporal_cycles_johnson_device(
     const CudaGraphData& graph,
     int device_id,
     Timestamp window_width,
-    std::size_t max_cycle_length);
+    std::size_t max_cycle_length,
+    const std::vector<CudaStartEvent>& start_events);
 
 }  // namespace detail
 #endif
@@ -85,8 +89,12 @@ CycleHistogram count_time_window_cycles_johnson(
 
 #if CYCLE_ENUM_CUDA_ENABLED
   require_device(device_id);
+  // Time-window mode does not require increasing timestamps, so the temporal
+  // cycle-union prefilter does not apply; every start event is kept.
+  const std::vector<CudaStartEvent> start_events = build_start_events(graph);
   return detail::count_time_window_cycles_johnson_device(
-      pack_graph_for_cuda(graph), device_id, window_width, max_cycle_length);
+      pack_graph_for_cuda(graph), device_id, window_width, max_cycle_length,
+      start_events);
 #else
   (void)graph;
   (void)device_id;
@@ -104,8 +112,13 @@ CycleHistogram count_temporal_cycles_johnson(
 
 #if CYCLE_ENUM_CUDA_ENABLED
   require_device(device_id);
+  // Drop start edges that cannot close a temporal cycle inside the window
+  // before paying for a device launch. The prefilter is correctness preserving.
+  const StartEventSet start_events =
+      build_temporal_start_events(graph, window_width, /*use_cycle_union=*/true);
   return detail::count_temporal_cycles_johnson_device(
-      pack_graph_for_cuda(graph), device_id, window_width, max_cycle_length);
+      pack_graph_for_cuda(graph), device_id, window_width, max_cycle_length,
+      start_events.events);
 #else
   (void)graph;
   (void)device_id;

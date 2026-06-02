@@ -2,6 +2,7 @@
 
 #include "cycle_enum/cuda/cuda_graph.hpp"
 #include "cycle_enum/cuda/cuda_timestamp.hpp"
+#include "cycle_enum/cuda/cuda_work_item.hpp"
 
 #include <cuda_runtime_api.h>
 
@@ -27,11 +28,9 @@ struct DeviceGraphView {
   const Timestamp* timestamps = nullptr;
 };
 
-struct CudaStartEvent {
-  VertexId root = 0;
-  VertexId first_vertex = 0;
-  Timestamp start_timestamp = 0;
-};
+// CudaStartEvent is the host-shared plain layout from cuda_work_item.hpp. The
+// host dispatcher builds (and for temporal mode cycle-union prefilters) the
+// start events, then hands them to these kernels.
 
 void check_cuda(const cudaError_t error, const char* operation) {
   if (error != cudaSuccess) {
@@ -416,32 +415,6 @@ std::size_t shared_histogram_bytes(const std::size_t max_cycle_length) {
   return (max_cycle_length + 1) * sizeof(unsigned long long);
 }
 
-std::vector<CudaStartEvent> build_time_window_start_events(
-    const CudaGraphData& graph) {
-  std::vector<CudaStartEvent> events;
-  events.reserve(checked_allocation_count(graph.timestamp_count,
-                                          "start event count"));
-
-  for (DeviceOffset root = 0; root < graph.vertex_count; ++root) {
-    const DeviceOffset begin = graph.outgoing_offsets[root];
-    const DeviceOffset end = graph.outgoing_offsets[root + 1];
-    for (DeviceOffset offset = begin; offset < end; ++offset) {
-      const CudaAdjacencyEntry& edge = graph.outgoing_edges[offset];
-      for (DeviceOffset timestamp_offset = edge.timestamp_begin;
-           timestamp_offset < edge.timestamp_end; ++timestamp_offset) {
-        events.push_back(CudaStartEvent{
-            static_cast<VertexId>(root),
-            edge.vertex,
-            graph.timestamps[checked_allocation_count(timestamp_offset,
-                                                      "timestamp offset")],
-        });
-      }
-    }
-  }
-
-  return events;
-}
-
 }  // namespace
 
 CycleHistogram count_simple_cycles_johnson_device(
@@ -511,7 +484,8 @@ CycleHistogram count_time_window_cycles_johnson_device(
     const CudaGraphData& graph,
     const int device_id,
     const Timestamp window_width,
-    const std::size_t max_cycle_length) {
+    const std::size_t max_cycle_length,
+    const std::vector<CudaStartEvent>& start_events) {
   if (graph.vertex_count == 0 || graph.edge_count == 0 ||
       graph.timestamp_count == 0) {
     return CycleHistogram{};
@@ -521,8 +495,6 @@ CycleHistogram count_time_window_cycles_johnson_device(
     throw std::overflow_error("max_cycle_length exceeds CUDA kernel limit");
   }
 
-  const std::vector<CudaStartEvent> start_events =
-      build_time_window_start_events(graph);
   if (start_events.empty()) {
     return CycleHistogram{};
   }
@@ -590,7 +562,8 @@ CycleHistogram count_temporal_cycles_johnson_device(
     const CudaGraphData& graph,
     const int device_id,
     const Timestamp window_width,
-    const std::size_t max_cycle_length) {
+    const std::size_t max_cycle_length,
+    const std::vector<CudaStartEvent>& start_events) {
   if (graph.vertex_count == 0 || graph.edge_count == 0 ||
       graph.timestamp_count == 0) {
     return CycleHistogram{};
@@ -600,8 +573,6 @@ CycleHistogram count_temporal_cycles_johnson_device(
     throw std::overflow_error("max_cycle_length exceeds CUDA kernel limit");
   }
 
-  const std::vector<CudaStartEvent> start_events =
-      build_time_window_start_events(graph);
   if (start_events.empty()) {
     return CycleHistogram{};
   }

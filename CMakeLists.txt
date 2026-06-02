@@ -175,6 +175,7 @@ add_library(cycle_enum_cuda
   src/cuda/cuda_config.cpp
   src/cuda/cuda_graph.cpp
   src/cuda/cuda_johnson.cpp
+  src/cuda/cuda_work_item.cpp
 )
 
 add_library(cycle_enum::cuda ALIAS cycle_enum_cuda)
@@ -182,6 +183,7 @@ add_library(cycle_enum::cuda ALIAS cycle_enum_cuda)
 target_link_libraries(cycle_enum_cuda
   PUBLIC
     cycle_enum::core
+    cycle_enum::sequential
 )
 
 target_compile_features(cycle_enum_cuda PUBLIC cxx_std_17)
