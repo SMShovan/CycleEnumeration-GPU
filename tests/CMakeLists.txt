@@ -34,6 +34,7 @@ add_executable(cycle_enum_core_test
   unit/cuda_graph_test.cpp
   unit/cuda_timestamp_test.cpp
   unit/cuda_work_item_test.cpp
+  unit/cuda_work_queue_test.cpp
   unit/cycle_union_test.cpp
   unit/graph_parser_test.cpp
   unit/graph_view_test.cpp

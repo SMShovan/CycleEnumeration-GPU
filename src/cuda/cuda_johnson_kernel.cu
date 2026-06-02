@@ -3,6 +3,7 @@
 #include "cycle_enum/cuda/cuda_graph.hpp"
 #include "cycle_enum/cuda/cuda_timestamp.hpp"
 #include "cycle_enum/cuda/cuda_work_item.hpp"
+#include "cycle_enum/cuda/cuda_work_queue.hpp"
 
 #include <cuda_runtime_api.h>
 
@@ -174,6 +175,71 @@ __global__ void count_roots_kernel(DeviceGraphView graph,
     const DeviceOffset thread_id = root;
     const DeviceOffset base =
         thread_id * static_cast<DeviceOffset>(max_cycle_length);
+    int depth = 1;
+    paths[base] = static_cast<VertexId>(root);
+    cursors[base] = graph.outgoing_offsets[root];
+
+    while (depth > 0) {
+      const VertexId current =
+          paths[base + static_cast<DeviceOffset>(depth - 1)];
+      const DeviceOffset end = graph.outgoing_offsets[current + 1];
+      DeviceOffset& cursor =
+          cursors[base + static_cast<DeviceOffset>(depth - 1)];
+
+      if (cursor >= end) {
+        --depth;
+        continue;
+      }
+
+      const VertexId next = graph.outgoing_neighbors[cursor];
+      ++cursor;
+
+      if (next == root && depth >= 2) {
+        increment_block_histogram(block_histogram, depth);
+        continue;
+      }
+
+      if (next <= root || depth >= max_cycle_length ||
+          path_contains(paths, base, depth, next)) {
+        continue;
+      }
+
+      paths[base + static_cast<DeviceOffset>(depth)] = next;
+      cursors[base + static_cast<DeviceOffset>(depth)] =
+          graph.outgoing_offsets[next];
+      ++depth;
+    }
+  }
+
+  flush_block_histogram(block_histogram, histogram, max_cycle_length);
+}
+
+// Persistent work-queue variant of the static counter. A fixed wave of blocks
+// stays resident and each thread repeatedly claims the next root from a global
+// atomic counter, so a few heavy roots no longer leave most threads idle. The
+// per-root depth-first search is identical to count_roots_kernel; only the
+// scheduling differs. The per-thread stack is indexed by global thread id, since
+// one thread processes many roots in sequence.
+__global__ void count_roots_queue_kernel(DeviceGraphView graph,
+                                         int max_cycle_length,
+                                         unsigned long long* work_counter,
+                                         VertexId* paths,
+                                         DeviceOffset* cursors,
+                                         unsigned long long* histogram) {
+  extern __shared__ unsigned long long block_histogram[];
+  clear_block_histogram(block_histogram, max_cycle_length);
+
+  const DeviceOffset thread_id =
+      static_cast<DeviceOffset>(blockIdx.x) * blockDim.x + threadIdx.x;
+  const DeviceOffset base =
+      thread_id * static_cast<DeviceOffset>(max_cycle_length);
+
+  while (true) {
+    const DeviceOffset root = atomicAdd(work_counter, 1ULL);
+    if (root >= graph.vertex_count) {
+      break;
+    }
+
     int depth = 1;
     paths[base] = static_cast<VertexId>(root);
     cursors[base] = graph.outgoing_offsets[root];
@@ -516,6 +582,76 @@ CycleHistogram count_simple_cycles_johnson_device(
       cursors.get(), histogram.get());
   check_cuda(cudaGetLastError(), "count_roots_kernel launch");
   check_cuda(cudaDeviceSynchronize(), "count_roots_kernel synchronize");
+
+  std::vector<unsigned long long> host_histogram(max_cycle_length + 1, 0);
+  histogram.copy_to_host(host_histogram, "copy histogram");
+
+  CycleHistogram result;
+  for (std::size_t length = 2; length <= max_cycle_length; ++length) {
+    if (host_histogram[length] == 0) {
+      continue;
+    }
+    result.increment(static_cast<CycleHistogram::Length>(length),
+                     static_cast<CycleHistogram::Count>(host_histogram[length]));
+  }
+  return result;
+}
+
+CycleHistogram count_simple_cycles_johnson_queue_device(
+    const CudaGraphData& graph,
+    const int device_id,
+    const std::size_t max_cycle_length) {
+  if (graph.vertex_count == 0 || graph.edge_count == 0) {
+    return CycleHistogram{};
+  }
+  if (max_cycle_length > static_cast<std::size_t>(
+                             std::numeric_limits<int>::max())) {
+    throw std::overflow_error("max_cycle_length exceeds CUDA kernel limit");
+  }
+
+  check_cuda(cudaSetDevice(device_id), "cudaSetDevice");
+
+  cudaDeviceProp properties{};
+  check_cuda(cudaGetDeviceProperties(&properties, device_id),
+             "cudaGetDeviceProperties");
+
+  constexpr unsigned int block_size = 128;
+  constexpr unsigned int blocks_per_sm = 16;
+  const WorkQueueLaunch launch = plan_work_queue_launch(
+      graph.vertex_count, block_size, blocks_per_sm,
+      static_cast<unsigned int>(properties.multiProcessorCount));
+  if (launch.grid_blocks == 0) {
+    return CycleHistogram{};
+  }
+
+  DeviceGraph device = upload_graph(graph, /*with_timestamps=*/false);
+  DeviceBuffer<unsigned long long> histogram(max_cycle_length + 1);
+  DeviceBuffer<unsigned long long> work_counter(1);
+
+  const DeviceOffset total_threads =
+      static_cast<DeviceOffset>(launch.grid_blocks) *
+      static_cast<DeviceOffset>(launch.block_size);
+  const DeviceOffset per_thread_stack =
+      checked_stack_slots(total_threads, max_cycle_length, "work-queue");
+  DeviceBuffer<VertexId> paths(checked_allocation_count(per_thread_stack,
+                                                        "path stack"));
+  DeviceBuffer<DeviceOffset> cursors(checked_allocation_count(per_thread_stack,
+                                                              "cursor stack"));
+
+  check_cuda(cudaMemset(histogram.get(), 0,
+                        sizeof(unsigned long long) * (max_cycle_length + 1)),
+             "clear histogram");
+  check_cuda(cudaMemset(work_counter.get(), 0, sizeof(unsigned long long)),
+             "clear work counter");
+
+  const DeviceGraphView device_graph = device.view();
+  const std::size_t shared_bytes = shared_histogram_bytes(max_cycle_length);
+  count_roots_queue_kernel<<<launch.grid_blocks, launch.block_size,
+                             shared_bytes>>>(
+      device_graph, static_cast<int>(max_cycle_length), work_counter.get(),
+      paths.get(), cursors.get(), histogram.get());
+  check_cuda(cudaGetLastError(), "count_roots_queue_kernel launch");
+  check_cuda(cudaDeviceSynchronize(), "count_roots_queue_kernel synchronize");
 
   std::vector<unsigned long long> host_histogram(max_cycle_length + 1, 0);
   histogram.copy_to_host(host_histogram, "copy histogram");

@@ -201,6 +201,13 @@ intended to preserve enough technical context for a later project report.
   the split arrays through a shared device view and a centralized upload helper,
   which keeps warp loads coalesced and lets the static path skip timestamp data
   entirely. Host packing is unit tested to mirror the array-of-structs layout.
+- Added a persistent work-queue CUDA path for static cycle counting. A fixed
+  wave of resident blocks pulls root vertices from a global atomic counter
+  instead of mapping one root to one thread, so skewed search trees no longer
+  leave most threads idle. The host-side launch planner that sizes the resident
+  grid to the device, capped by the work-item count, is unit tested, and the
+  unavailable-backend and argument-validation paths are checked locally; device
+  parity with the naive static counter is validated on the cluster.
 
 ### Notes
 
