@@ -241,6 +241,11 @@ intended to preserve enough technical context for a later project report.
   `CYCLE_ENUM_CUDA_BLOCK_SIZE` and `CYCLE_ENUM_CUDA_BLOCKS_PER_SM`, a sweep script
   records the best timing per combination with a total-cycle correctness guard,
   and the reader's defaults, overrides, and validation are unit tested.
+- Promoted the persistent work-queue kernel to the default static CUDA path and
+  exposed `--cuda-scheduler <naive|work-queue>` in the CLI, keeping the naive
+  one-root-per-thread kernel available for debugging. Added a CUDA strategy
+  design note, documented the scheduler in the README, and covered scheduler
+  parsing and the unavailable-backend path with CLI tests.
 
 ### Notes
 

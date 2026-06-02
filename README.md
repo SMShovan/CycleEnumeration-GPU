@@ -37,6 +37,12 @@ CUDA runtime detection is wired into the build as an optional target. On
 non-CUDA machines it compiles as an unavailable backend; on NVIDIA systems,
 `CYCLE_ENUM_ENABLE_CUDA=ON` enables CUDA language support and links the runtime.
 
+The static CUDA path has two schedulers, selected with
+`--cuda-scheduler <naive|work-queue>`. The default `work-queue` uses persistent
+blocks that claim roots from a global counter for better load balance on skewed
+graphs; `naive` keeps the one-root-per-thread kernel for debugging and parity
+checks. See `docs/design/cuda_strategy.md` for the full GPU design.
+
 ## Build and Run
 
 ```sh

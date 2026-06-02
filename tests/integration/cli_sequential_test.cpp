@@ -320,4 +320,56 @@ TEST(CliCudaTest, TemporalReportsUnavailableBackendWhenNotCompiled) {
   EXPECT_NE(output.find("CUDA support is not compiled"), std::string::npos);
 }
 
+TEST(CliCudaTest, RejectsUnknownScheduler) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "cuda",
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "simple",
+          "--max-cycle-length",
+          "4",
+          "--cuda-scheduler",
+          "bogus",
+      },
+      status);
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("unknown cuda scheduler"), std::string::npos);
+}
+
+TEST(CliCudaTest, AcceptsWorkQueueScheduler) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input",
+          data_path("sample_temporal.txt"),
+          "--backend",
+          "cuda",
+          "--algorithm",
+          "johnson",
+          "--mode",
+          "simple",
+          "--max-cycle-length",
+          "4",
+          "--cuda-scheduler",
+          "work-queue",
+      },
+      status);
+
+  // The flag parses; without a compiled CUDA backend the run still fails at
+  // dispatch with the unavailable-backend message rather than an option error.
+  if (output.find("CUDA support is not compiled") == std::string::npos) {
+    GTEST_SKIP() << "CUDA support is compiled in this test build";
+  }
+  EXPECT_NE(status, 0);
+  EXPECT_EQ(output.find("unknown cuda scheduler"), std::string::npos);
+  EXPECT_NE(output.find("CUDA support is not compiled"), std::string::npos);
+}
+
 }  // namespace

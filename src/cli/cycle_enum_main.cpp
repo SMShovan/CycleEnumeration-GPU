@@ -3,6 +3,7 @@
 #include "cycle_enum/core/options.hpp"
 #include "cycle_enum/core/version.hpp"
 #include "cycle_enum/cuda/cuda_johnson.hpp"
+#include "cycle_enum/cuda/cuda_work_queue.hpp"
 #include "cycle_enum/openmp/openmp_johnson.hpp"
 #include "cycle_enum/openmp/openmp_read_tarjan.hpp"
 #include "cycle_enum/openmp/openmp_temporal_johnson.hpp"
@@ -29,10 +30,16 @@
 
 namespace {
 
+// Selects between the naive one-thread-per-root CUDA static kernel and the
+// optimized persistent work-queue kernel. The work queue is the default static
+// path; naive stays available for debugging and parity checks.
+enum class CudaScheduler { Naive, WorkQueue };
+
 struct CliConfig {
   std::filesystem::path input_path;
   cycle_enum::CycleEnumerationOptions options =
       cycle_enum::default_options();
+  CudaScheduler cuda_scheduler = CudaScheduler::WorkQueue;
   bool show_help = false;
   bool show_version = false;
 };
@@ -47,8 +54,21 @@ void print_usage(std::ostream& out) {
       << "  --max-cycle-length <integer >= 2>\n"
       << "  --openmp-threads <positive integer>\n"
       << "  --cuda-device <non-negative integer>\n"
+      << "  --cuda-scheduler <naive|work-queue>\n"
       << "  --help\n"
       << "  --version\n";
+}
+
+[[nodiscard]] std::optional<CudaScheduler> parse_cuda_scheduler(
+    const std::string_view value) noexcept {
+  if (value == "naive") {
+    return CudaScheduler::Naive;
+  }
+  if (value == "work-queue" || value == "work_queue" || value == "workqueue" ||
+      value == "queue") {
+    return CudaScheduler::WorkQueue;
+  }
+  return std::nullopt;
 }
 
 [[nodiscard]] bool is_option(const std::string_view value) noexcept {
@@ -258,6 +278,20 @@ template <typename Integer>
       continue;
     }
 
+    if (option == "--cuda-scheduler" || option == "--scheduler") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto scheduler = parse_cuda_scheduler(*value);
+      if (!scheduler.has_value()) {
+        err << "unknown cuda scheduler: " << *value << '\n';
+        return std::nullopt;
+      }
+      config.cuda_scheduler = *scheduler;
+      continue;
+    }
+
     if (option == "--time-window" || option == "--window") {
       const auto value = next_value(args, index, option, err);
       if (!value.has_value()) {
@@ -406,10 +440,15 @@ template <typename Integer>
 
 [[nodiscard]] cycle_enum::CycleHistogram run_cuda(
     const cycle_enum::GraphView& graph,
-    const cycle_enum::CycleEnumerationOptions& options) {
+    const cycle_enum::CycleEnumerationOptions& options,
+    const CudaScheduler scheduler) {
   if (options.mode == cycle_enum::CycleMode::Simple &&
       options.algorithm == cycle_enum::AlgorithmFamily::Johnson &&
       options.max_cycle_length.has_value()) {
+    if (scheduler == CudaScheduler::WorkQueue) {
+      return cycle_enum::cuda::count_simple_cycles_johnson_work_queue(
+          graph, options.cuda_device_id, *options.max_cycle_length);
+    }
     return cycle_enum::cuda::count_simple_cycles_johnson(
         graph, options.cuda_device_id, *options.max_cycle_length);
   }
@@ -433,14 +472,15 @@ template <typename Integer>
 
 [[nodiscard]] cycle_enum::CycleHistogram run_backend(
     const cycle_enum::GraphView& graph,
-    const cycle_enum::CycleEnumerationOptions& options) {
+    const cycle_enum::CycleEnumerationOptions& options,
+    const CudaScheduler scheduler) {
   switch (options.execution) {
     case cycle_enum::ExecutionPolicy::Sequential:
       return run_sequential(graph, options);
     case cycle_enum::ExecutionPolicy::OpenMP:
       return run_openmp(graph, options);
     case cycle_enum::ExecutionPolicy::Cuda:
-      return run_cuda(graph, options);
+      return run_cuda(graph, options, scheduler);
   }
 
   throw std::logic_error("unsupported execution backend");
@@ -474,7 +514,7 @@ int main(int argc, char** argv) {
         cycle_enum::read_temporal_graph(config->input_path);
     const cycle_enum::GraphView view = cycle_enum::build_graph_view(parsed);
     const cycle_enum::CycleHistogram histogram =
-        run_backend(view, config->options);
+        run_backend(view, config->options, config->cuda_scheduler);
     std::cout << histogram.to_csv();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
