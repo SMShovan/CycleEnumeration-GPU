@@ -46,6 +46,15 @@ struct CudaGraphData {
   std::vector<DeviceOffset> incoming_offsets; ///< CSC incoming offsets.
   std::vector<CudaAdjacencyEntry> incoming_edges; ///< CSC adjacency entries.
   std::vector<Timestamp> timestamps; ///< Flat timestamp storage.
+
+  // Structure-of-arrays view of the hot outgoing adjacency. The traversal
+  // kernels read these split arrays so each warp load touches only the field it
+  // needs and consecutive lanes read consecutive addresses, which keeps the
+  // loads coalesced. They hold the same data as `outgoing_edges`, indexed by the
+  // same CSR offset, with neighbor ids kept as compact 32-bit `VertexId`.
+  std::vector<VertexId> outgoing_neighbors; ///< SoA target vertex per edge slot.
+  std::vector<DeviceOffset> outgoing_timestamp_begin; ///< SoA inclusive offset.
+  std::vector<DeviceOffset> outgoing_timestamp_end; ///< SoA exclusive offset.
 };
 
 /**

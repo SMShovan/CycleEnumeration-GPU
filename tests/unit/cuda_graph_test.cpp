@@ -37,6 +37,26 @@ TEST(CudaGraphTest, PacksGraphViewIntoFixedWidthArrays) {
             (std::vector<cycle_enum::Timestamp>{3, 5, 7, 6}));
 }
 
+TEST(CudaGraphTest, PacksOutgoingAdjacencyAsStructureOfArrays) {
+  const cycle_enum::GraphView view = cycle_enum::build_graph_view(sample_graph());
+  const cycle_enum::cuda::CudaGraphData packed =
+      cycle_enum::cuda::pack_graph_for_cuda(view);
+
+  // The SoA hot-path arrays must mirror the AoS layout entry by entry.
+  ASSERT_EQ(packed.outgoing_neighbors.size(), packed.outgoing_edges.size());
+  ASSERT_EQ(packed.outgoing_timestamp_begin.size(), packed.outgoing_edges.size());
+  ASSERT_EQ(packed.outgoing_timestamp_end.size(), packed.outgoing_edges.size());
+
+  for (std::size_t index = 0; index < packed.outgoing_edges.size(); ++index) {
+    EXPECT_EQ(packed.outgoing_neighbors[index],
+              packed.outgoing_edges[index].vertex);
+    EXPECT_EQ(packed.outgoing_timestamp_begin[index],
+              packed.outgoing_edges[index].timestamp_begin);
+    EXPECT_EQ(packed.outgoing_timestamp_end[index],
+              packed.outgoing_edges[index].timestamp_end);
+  }
+}
+
 TEST(CudaGraphTest, PacksEmptyGraph) {
   const cycle_enum::GraphView view =
       cycle_enum::build_graph_view(cycle_enum::TemporalGraph({},

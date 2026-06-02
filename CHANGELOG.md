@@ -195,6 +195,12 @@ intended to preserve enough technical context for a later project report.
   timestamps on the host and carries a device-side multiplicity scalar, deferring
   full path-dependent bundling until profiling justifies its unbounded per-thread
   state. The decision is recorded for the Phase 8 timestamp-lookup work.
+- Optimized the CUDA graph memory layout by emitting the hot outgoing adjacency
+  as a structure of arrays (split neighbor, timestamp-begin, and timestamp-end
+  arrays) alongside the existing array-of-structs. The traversal kernels now read
+  the split arrays through a shared device view and a centralized upload helper,
+  which keeps warp loads coalesced and lets the static path skip timestamp data
+  entirely. Host packing is unit tested to mirror the array-of-structs layout.
 
 ### Notes
 

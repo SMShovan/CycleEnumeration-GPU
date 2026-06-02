@@ -21,10 +21,15 @@ namespace detail {
 
 namespace {
 
+// Structure-of-arrays device view of the hot outgoing adjacency. Splitting the
+// fields keeps each warp load coalesced because consecutive lanes read
+// consecutive addresses of a single field.
 struct DeviceGraphView {
   DeviceOffset vertex_count = 0;
   const DeviceOffset* outgoing_offsets = nullptr;
-  const CudaAdjacencyEntry* outgoing_edges = nullptr;
+  const VertexId* outgoing_neighbors = nullptr;
+  const DeviceOffset* outgoing_timestamp_begin = nullptr;
+  const DeviceOffset* outgoing_timestamp_end = nullptr;
   const Timestamp* timestamps = nullptr;
 };
 
@@ -185,7 +190,7 @@ __global__ void count_roots_kernel(DeviceGraphView graph,
         continue;
       }
 
-      const VertexId next = graph.outgoing_edges[cursor].vertex;
+      const VertexId next = graph.outgoing_neighbors[cursor];
       ++cursor;
 
       if (next == root && depth >= 2) {
@@ -243,19 +248,21 @@ __global__ void count_time_window_start_events_kernel(
         continue;
       }
 
-      const CudaAdjacencyEntry edge = graph.outgoing_edges[cursor];
+      const DeviceOffset slot = cursor;
       ++cursor;
 
       const CudaTimestampStartPolicy policy =
           event.root > current ? CudaTimestampStartPolicy::Inclusive
                                : CudaTimestampStartPolicy::AfterStart;
-      if (!has_timestamp_in_window(graph.timestamps, edge.timestamp_begin,
-                                   edge.timestamp_end, event.start_timestamp,
+      if (!has_timestamp_in_window(graph.timestamps,
+                                   graph.outgoing_timestamp_begin[slot],
+                                   graph.outgoing_timestamp_end[slot],
+                                   event.start_timestamp,
                                    window_width, policy)) {
         continue;
       }
 
-      const VertexId next = edge.vertex;
+      const VertexId next = graph.outgoing_neighbors[slot];
       if (next == event.root && depth >= 2) {
         increment_block_histogram(block_histogram, depth);
         continue;
@@ -317,9 +324,7 @@ __global__ void count_temporal_start_events_kernel(
           const DeviceOffset timestamp_offset = timestamp_cursors[frame];
           ++timestamp_cursors[frame];
           const Timestamp next_timestamp = graph.timestamps[timestamp_offset];
-          const CudaAdjacencyEntry edge =
-              graph.outgoing_edges[active_edges[frame]];
-          const VertexId next = edge.vertex;
+          const VertexId next = graph.outgoing_neighbors[active_edges[frame]];
 
           if (next == event.root && depth >= 2) {
             increment_block_histogram(block_histogram, depth);
@@ -352,11 +357,10 @@ __global__ void count_temporal_start_events_kernel(
 
         const DeviceOffset edge_offset = edge_cursor;
         ++edge_cursor;
-        const CudaAdjacencyEntry edge = graph.outgoing_edges[edge_offset];
-        const CudaTimestampRange range =
-            timestamps_after(graph.timestamps, edge.timestamp_begin,
-                             edge.timestamp_end, arrival_timestamps[frame],
-                             window_end);
+        const CudaTimestampRange range = timestamps_after(
+            graph.timestamps, graph.outgoing_timestamp_begin[edge_offset],
+            graph.outgoing_timestamp_end[edge_offset],
+            arrival_timestamps[frame], window_end);
         if (range.empty()) {
           continue;
         }
@@ -415,6 +419,62 @@ std::size_t shared_histogram_bytes(const std::size_t max_cycle_length) {
   return (max_cycle_length + 1) * sizeof(unsigned long long);
 }
 
+// Owns the device-side graph arrays and exposes a kernel view over them. The
+// outgoing adjacency is uploaded as a structure of arrays so kernel loads stay
+// coalesced. Centralizing the upload keeps the three device entry points
+// consistent. `timestamps` is only uploaded for the time-window and temporal
+// paths; the static path passes false and leaves the timestamp pointer null.
+struct DeviceGraph {
+  DeviceBuffer<DeviceOffset> outgoing_offsets;
+  DeviceBuffer<VertexId> outgoing_neighbors;
+  DeviceBuffer<DeviceOffset> outgoing_timestamp_begin;
+  DeviceBuffer<DeviceOffset> outgoing_timestamp_end;
+  DeviceBuffer<Timestamp> timestamps;
+  DeviceOffset vertex_count = 0;
+  bool has_timestamps = false;
+
+  [[nodiscard]] DeviceGraphView view() {
+    return DeviceGraphView{
+        vertex_count,
+        outgoing_offsets.get(),
+        outgoing_neighbors.get(),
+        outgoing_timestamp_begin.get(),
+        outgoing_timestamp_end.get(),
+        has_timestamps ? timestamps.get() : nullptr,
+    };
+  }
+};
+
+DeviceGraph upload_graph(const CudaGraphData& graph, const bool with_timestamps) {
+  DeviceGraph device;
+  device.vertex_count = graph.vertex_count;
+  device.has_timestamps = with_timestamps;
+
+  device.outgoing_offsets = DeviceBuffer<DeviceOffset>(graph.outgoing_offsets.size());
+  device.outgoing_neighbors =
+      DeviceBuffer<VertexId>(graph.outgoing_neighbors.size());
+  device.outgoing_timestamp_begin =
+      DeviceBuffer<DeviceOffset>(graph.outgoing_timestamp_begin.size());
+  device.outgoing_timestamp_end =
+      DeviceBuffer<DeviceOffset>(graph.outgoing_timestamp_end.size());
+
+  device.outgoing_offsets.copy_from_host(graph.outgoing_offsets,
+                                         "copy outgoing offsets");
+  device.outgoing_neighbors.copy_from_host(graph.outgoing_neighbors,
+                                           "copy outgoing neighbors");
+  device.outgoing_timestamp_begin.copy_from_host(
+      graph.outgoing_timestamp_begin, "copy outgoing timestamp begin");
+  device.outgoing_timestamp_end.copy_from_host(graph.outgoing_timestamp_end,
+                                               "copy outgoing timestamp end");
+
+  if (with_timestamps) {
+    device.timestamps = DeviceBuffer<Timestamp>(graph.timestamps.size());
+    device.timestamps.copy_from_host(graph.timestamps, "copy timestamps");
+  }
+
+  return device;
+}
+
 }  // namespace
 
 CycleHistogram count_simple_cycles_johnson_device(
@@ -431,8 +491,7 @@ CycleHistogram count_simple_cycles_johnson_device(
 
   check_cuda(cudaSetDevice(device_id), "cudaSetDevice");
 
-  DeviceBuffer<DeviceOffset> outgoing_offsets(graph.outgoing_offsets.size());
-  DeviceBuffer<CudaAdjacencyEntry> outgoing_edges(graph.outgoing_edges.size());
+  DeviceGraph device = upload_graph(graph, /*with_timestamps=*/false);
   DeviceBuffer<unsigned long long> histogram(max_cycle_length + 1);
 
   const DeviceOffset per_thread_stack =
@@ -442,19 +501,11 @@ CycleHistogram count_simple_cycles_johnson_device(
   DeviceBuffer<DeviceOffset> cursors(checked_allocation_count(per_thread_stack,
                                                               "cursor stack"));
 
-  outgoing_offsets.copy_from_host(graph.outgoing_offsets,
-                                  "copy outgoing offsets");
-  outgoing_edges.copy_from_host(graph.outgoing_edges, "copy outgoing edges");
   check_cuda(cudaMemset(histogram.get(), 0,
                         sizeof(unsigned long long) * (max_cycle_length + 1)),
              "clear histogram");
 
-  const DeviceGraphView device_graph{
-      graph.vertex_count,
-      outgoing_offsets.get(),
-      outgoing_edges.get(),
-      nullptr,
-  };
+  const DeviceGraphView device_graph = device.view();
 
   constexpr unsigned int block_size = 128;
   const unsigned int blocks =
@@ -501,9 +552,7 @@ CycleHistogram count_time_window_cycles_johnson_device(
 
   check_cuda(cudaSetDevice(device_id), "cudaSetDevice");
 
-  DeviceBuffer<DeviceOffset> outgoing_offsets(graph.outgoing_offsets.size());
-  DeviceBuffer<CudaAdjacencyEntry> outgoing_edges(graph.outgoing_edges.size());
-  DeviceBuffer<Timestamp> timestamps(graph.timestamps.size());
+  DeviceGraph device = upload_graph(graph, /*with_timestamps=*/true);
   DeviceBuffer<CudaStartEvent> device_start_events(start_events.size());
   DeviceBuffer<unsigned long long> histogram(max_cycle_length + 1);
 
@@ -516,21 +565,12 @@ CycleHistogram count_time_window_cycles_johnson_device(
   DeviceBuffer<DeviceOffset> cursors(checked_allocation_count(per_thread_stack,
                                                               "cursor stack"));
 
-  outgoing_offsets.copy_from_host(graph.outgoing_offsets,
-                                  "copy outgoing offsets");
-  outgoing_edges.copy_from_host(graph.outgoing_edges, "copy outgoing edges");
-  timestamps.copy_from_host(graph.timestamps, "copy timestamps");
   device_start_events.copy_from_host(start_events, "copy start events");
   check_cuda(cudaMemset(histogram.get(), 0,
                         sizeof(unsigned long long) * (max_cycle_length + 1)),
              "clear histogram");
 
-  const DeviceGraphView device_graph{
-      graph.vertex_count,
-      outgoing_offsets.get(),
-      outgoing_edges.get(),
-      timestamps.get(),
-  };
+  const DeviceGraphView device_graph = device.view();
 
   constexpr unsigned int block_size = 128;
   const unsigned int blocks =
@@ -579,9 +619,7 @@ CycleHistogram count_temporal_cycles_johnson_device(
 
   check_cuda(cudaSetDevice(device_id), "cudaSetDevice");
 
-  DeviceBuffer<DeviceOffset> outgoing_offsets(graph.outgoing_offsets.size());
-  DeviceBuffer<CudaAdjacencyEntry> outgoing_edges(graph.outgoing_edges.size());
-  DeviceBuffer<Timestamp> timestamps(graph.timestamps.size());
+  DeviceGraph device = upload_graph(graph, /*with_timestamps=*/true);
   DeviceBuffer<CudaStartEvent> device_start_events(start_events.size());
   DeviceBuffer<unsigned long long> histogram(max_cycle_length + 1);
 
@@ -602,21 +640,12 @@ CycleHistogram count_temporal_cycles_johnson_device(
   DeviceBuffer<Timestamp> arrival_timestamps(
       checked_allocation_count(per_thread_stack, "arrival timestamp stack"));
 
-  outgoing_offsets.copy_from_host(graph.outgoing_offsets,
-                                  "copy outgoing offsets");
-  outgoing_edges.copy_from_host(graph.outgoing_edges, "copy outgoing edges");
-  timestamps.copy_from_host(graph.timestamps, "copy timestamps");
   device_start_events.copy_from_host(start_events, "copy start events");
   check_cuda(cudaMemset(histogram.get(), 0,
                         sizeof(unsigned long long) * (max_cycle_length + 1)),
              "clear histogram");
 
-  const DeviceGraphView device_graph{
-      graph.vertex_count,
-      outgoing_offsets.get(),
-      outgoing_edges.get(),
-      timestamps.get(),
-  };
+  const DeviceGraphView device_graph = device.view();
 
   constexpr unsigned int block_size = 128;
   const unsigned int blocks =

@@ -47,7 +47,7 @@ std::vector<CudaAdjacencyEntry> pack_adjacency(
 }  // namespace
 
 CudaGraphData pack_graph_for_cuda(const GraphView& graph) {
-  return CudaGraphData{
+  CudaGraphData packed{
       checked_offset(graph.vertex_count()),
       checked_offset(graph.edge_count()),
       checked_offset(graph.timestamp_count()),
@@ -56,7 +56,27 @@ CudaGraphData pack_graph_for_cuda(const GraphView& graph) {
       pack_offsets(graph.incoming_offsets()),
       pack_adjacency(graph.incoming_edges()),
       graph.timestamps(),
+      {},
+      {},
+      {},
   };
+
+  // Split the hot outgoing adjacency into a structure-of-arrays layout for
+  // coalesced device traversal. Neighbor ids stay 32-bit; timestamp bounds use
+  // the 64-bit device offset type so timestamp-heavy graphs remain representable.
+  const std::vector<AdjacencyEntry>& outgoing = graph.outgoing_edges();
+  packed.outgoing_neighbors.reserve(outgoing.size());
+  packed.outgoing_timestamp_begin.reserve(outgoing.size());
+  packed.outgoing_timestamp_end.reserve(outgoing.size());
+  for (const AdjacencyEntry& entry : outgoing) {
+    packed.outgoing_neighbors.push_back(entry.vertex);
+    packed.outgoing_timestamp_begin.push_back(
+        checked_offset(entry.timestamp_begin));
+    packed.outgoing_timestamp_end.push_back(
+        checked_offset(entry.timestamp_end));
+  }
+
+  return packed;
 }
 
 }  // namespace cycle_enum::cuda
