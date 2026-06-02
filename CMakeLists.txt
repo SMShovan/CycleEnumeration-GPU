@@ -213,6 +213,13 @@ if(CYCLE_ENUM_CUDA_AVAILABLE)
       CUDA_STANDARD 17
       CUDA_STANDARD_REQUIRED ON
   )
+  # Enable NVTX scoped ranges for Nsight profiling when the NVTX target is
+  # available. The ranges are no-ops without this define.
+  if(TARGET CUDA::nvToolsExt)
+    target_link_libraries(cycle_enum_cuda PUBLIC CUDA::nvToolsExt)
+    target_compile_definitions(cycle_enum_cuda PRIVATE CYCLE_ENUM_WITH_NVTX)
+    message(STATUS "NVTX profiling ranges enabled")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

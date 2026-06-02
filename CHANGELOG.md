@@ -230,6 +230,12 @@ intended to preserve enough technical context for a later project report.
   because it is already validated, overlaps with device execution, and has no
   measured bottleneck; the note records the concrete profiling criteria that
   would justify moving the reachability pass onto the GPU.
+- Added NVTX profiling hooks. A header-only scoped-range guard brackets kernel
+  and reduction phases and compiles as a no-op unless the build links NVTX, which
+  CMake enables automatically on CUDA builds where the NVTX target is present. An
+  Nsight profiling script runs a configuration under Nsight Systems and optionally
+  Nsight Compute, and the no-op path is unit tested so the instrumentation never
+  breaks the non-CUDA build.
 
 ### Notes
 

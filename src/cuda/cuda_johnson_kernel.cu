@@ -1,6 +1,7 @@
 #include "cycle_enum/cuda/cuda_johnson.hpp"
 
 #include "cycle_enum/cuda/cuda_graph.hpp"
+#include "cycle_enum/cuda/cuda_profiling.hpp"
 #include "cycle_enum/cuda/cuda_timestamp.hpp"
 #include "cycle_enum/cuda/cuda_work_item.hpp"
 #include "cycle_enum/cuda/cuda_work_queue.hpp"
@@ -646,15 +647,21 @@ CycleHistogram count_simple_cycles_johnson_queue_device(
 
   const DeviceGraphView device_graph = device.view();
   const std::size_t shared_bytes = shared_histogram_bytes(max_cycle_length);
-  count_roots_queue_kernel<<<launch.grid_blocks, launch.block_size,
-                             shared_bytes>>>(
-      device_graph, static_cast<int>(max_cycle_length), work_counter.get(),
-      paths.get(), cursors.get(), histogram.get());
-  check_cuda(cudaGetLastError(), "count_roots_queue_kernel launch");
-  check_cuda(cudaDeviceSynchronize(), "count_roots_queue_kernel synchronize");
+  {
+    const ScopedRange kernel_range("cuda_static_queue_kernel");
+    count_roots_queue_kernel<<<launch.grid_blocks, launch.block_size,
+                               shared_bytes>>>(
+        device_graph, static_cast<int>(max_cycle_length), work_counter.get(),
+        paths.get(), cursors.get(), histogram.get());
+    check_cuda(cudaGetLastError(), "count_roots_queue_kernel launch");
+    check_cuda(cudaDeviceSynchronize(), "count_roots_queue_kernel synchronize");
+  }
 
   std::vector<unsigned long long> host_histogram(max_cycle_length + 1, 0);
-  histogram.copy_to_host(host_histogram, "copy histogram");
+  {
+    const ScopedRange reduction_range("cuda_static_queue_reduction");
+    histogram.copy_to_host(host_histogram, "copy histogram");
+  }
 
   CycleHistogram result;
   for (std::size_t length = 2; length <= max_cycle_length; ++length) {
