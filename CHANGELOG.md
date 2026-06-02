@@ -260,6 +260,12 @@ intended to preserve enough technical context for a later project report.
   writes runtime bar charts when matplotlib is available while always producing
   the speedup table so it works on a bare cluster allocation. The benchmark
   README documents the matrix runner, the aggregator, and the analysis script.
+- Added a reference comparison protocol. A design note documents how to build and
+  run the SPAA/TBB baseline, the algorithm-id correspondence, and the
+  correctness-before-performance rule, and a comparison script runs the project
+  CLI and the baseline on the same input, normalizes both histograms, and reports
+  MATCH or MISMATCH. The script's normalization, match, and error paths were
+  exercised locally with a replayed baseline histogram.
 
 ### Notes
 
