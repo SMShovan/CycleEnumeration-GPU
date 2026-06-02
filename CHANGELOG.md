@@ -274,6 +274,11 @@ intended to preserve enough technical context for a later project report.
   sequential, OpenMP, and CUDA namespaces and an architecture overview, and the
   Doxyfile now includes the module page and the design notes so the generated
   site has navigable module pages. The HTML was generated locally without errors.
+- Added algorithm and OpenMP strategy design notes. They summarize the Johnson
+  and Read-Tarjan counters, the duplicate-avoidance and temporal techniques, and
+  the coarse-grained OpenMP scheme with its fine-grained task experiment, and
+  explain how the implementation differs from the paper's TBB approach. Together
+  with the CUDA strategy note they complete the design-note set.
 
 ### Notes
 
