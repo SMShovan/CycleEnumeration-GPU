@@ -250,6 +250,11 @@ intended to preserve enough technical context for a later project report.
   edge-list format, the in-repository fixtures, and the rules for external
   graphs, and a git-ignored `benchmarks/data/` directory holds local datasets so
   large or licensed graphs never enter version control.
+- Added benchmark collection scripts. A matrix runner validates that every
+  dataset exists before sweeping backends, algorithms, modes, and thread counts
+  into one CSV, and an aggregation script groups the measured rows per
+  configuration and reports run count, min, median, and mean elapsed time with a
+  total-cycle column. Both were exercised against real harness output.
 
 ### Notes
 
