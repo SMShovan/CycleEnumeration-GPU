@@ -176,6 +176,7 @@ add_library(cycle_enum_cuda
   src/cuda/cuda_config.cpp
   src/cuda/cuda_graph.cpp
   src/cuda/cuda_johnson.cpp
+  src/cuda/cuda_timestamp_groups.cpp
   src/cuda/cuda_work_item.cpp
   src/cuda/cuda_work_queue.cpp
 )

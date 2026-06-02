@@ -220,6 +220,12 @@ intended to preserve enough technical context for a later project report.
   selector that picks the bitset for graphs whose word array fits a tunable
   threshold and the sparse path scan otherwise. Bit operations are tested across
   word boundaries and for clear-all and mode selection.
+- Added host-side CUDA timestamp grouping. Each outgoing edge's sorted timestamp
+  list is collapsed into distinct values with multiplicities in a CSR-style
+  layout, so temporal kernels iterate distinct times and multiply by the group
+  count instead of branching over duplicate events. This implements the host half
+  of the hybrid bundling decision and is unit tested for count preservation,
+  per-edge ordering, and offset consistency.
 
 ### Notes
 
