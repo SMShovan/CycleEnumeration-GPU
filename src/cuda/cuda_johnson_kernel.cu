@@ -616,10 +616,9 @@ CycleHistogram count_simple_cycles_johnson_queue_device(
   check_cuda(cudaGetDeviceProperties(&properties, device_id),
              "cudaGetDeviceProperties");
 
-  constexpr unsigned int block_size = 128;
-  constexpr unsigned int blocks_per_sm = 16;
+  const WorkQueueTuning tuning = work_queue_tuning_from_env();
   const WorkQueueLaunch launch = plan_work_queue_launch(
-      graph.vertex_count, block_size, blocks_per_sm,
+      graph.vertex_count, tuning.block_size, tuning.blocks_per_sm,
       static_cast<unsigned int>(properties.multiProcessorCount));
   if (launch.grid_blocks == 0) {
     return CycleHistogram{};

@@ -3,12 +3,51 @@
 #include "cycle_enum/cuda/cuda_config.hpp"
 #include "cycle_enum/cuda/cuda_work_queue.hpp"
 
+#include <cstdlib>
 #include <stdexcept>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 namespace {
+
+void clear_tuning_env() {
+  unsetenv("CYCLE_ENUM_CUDA_BLOCK_SIZE");
+  unsetenv("CYCLE_ENUM_CUDA_BLOCKS_PER_SM");
+}
+
+TEST(CudaWorkQueueTest, TuningDefaultsWithoutEnvironment) {
+  clear_tuning_env();
+  const cycle_enum::cuda::WorkQueueTuning tuning =
+      cycle_enum::cuda::work_queue_tuning_from_env();
+  EXPECT_EQ(tuning.block_size, 128u);
+  EXPECT_EQ(tuning.blocks_per_sm, 16u);
+}
+
+TEST(CudaWorkQueueTest, TuningHonorsEnvironmentOverrides) {
+  setenv("CYCLE_ENUM_CUDA_BLOCK_SIZE", "256", 1);
+  setenv("CYCLE_ENUM_CUDA_BLOCKS_PER_SM", "8", 1);
+  const cycle_enum::cuda::WorkQueueTuning tuning =
+      cycle_enum::cuda::work_queue_tuning_from_env();
+  EXPECT_EQ(tuning.block_size, 256u);
+  EXPECT_EQ(tuning.blocks_per_sm, 8u);
+  clear_tuning_env();
+}
+
+TEST(CudaWorkQueueTest, TuningRejectsInvalidEnvironment) {
+  setenv("CYCLE_ENUM_CUDA_BLOCK_SIZE", "100", 1); // not a multiple of 32
+  EXPECT_THROW((void)cycle_enum::cuda::work_queue_tuning_from_env(),
+               std::invalid_argument);
+
+  setenv("CYCLE_ENUM_CUDA_BLOCK_SIZE", "abc", 1);
+  EXPECT_THROW((void)cycle_enum::cuda::work_queue_tuning_from_env(),
+               std::invalid_argument);
+
+  setenv("CYCLE_ENUM_CUDA_BLOCK_SIZE", "0", 1);
+  EXPECT_THROW((void)cycle_enum::cuda::work_queue_tuning_from_env(),
+               std::invalid_argument);
+  clear_tuning_env();
+}
 
 TEST(CudaWorkQueueTest, PlanFillsDeviceButNotBeyondWork) {
   // Resident capacity is blocks_per_sm * sm_count = 16 * 10 = 160.

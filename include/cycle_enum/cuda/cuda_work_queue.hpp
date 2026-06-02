@@ -21,6 +21,27 @@ struct WorkQueueLaunch {
 };
 
 /**
+ * @brief Tunable persistent-kernel launch parameters.
+ */
+struct WorkQueueTuning {
+  unsigned int block_size = 128; ///< Threads per block.
+  unsigned int blocks_per_sm = 16; ///< Resident blocks per multiprocessor.
+};
+
+/**
+ * @brief Read work-queue tuning parameters from the environment.
+ *
+ * `CYCLE_ENUM_CUDA_BLOCK_SIZE` and `CYCLE_ENUM_CUDA_BLOCKS_PER_SM` override the
+ * defaults so a tuning sweep can vary the launch without rebuilding. An unset
+ * variable keeps the default; a present but non-positive or unparseable value is
+ * rejected so sweep typos fail loudly. The block size must be a positive
+ * multiple of the 32-thread warp size.
+ *
+ * @throws std::invalid_argument if a present value is invalid.
+ */
+[[nodiscard]] WorkQueueTuning work_queue_tuning_from_env();
+
+/**
  * @brief Plan a persistent-kernel launch for a work-queue kernel.
  *
  * A persistent kernel launches a fixed wave of blocks that stay resident and

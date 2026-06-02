@@ -236,6 +236,11 @@ intended to preserve enough technical context for a later project report.
   Nsight profiling script runs a configuration under Nsight Systems and optionally
   Nsight Compute, and the no-op path is unit tested so the instrumentation never
   breaks the non-CUDA build.
+- Made the CUDA work-queue launch tunable from the environment. The kernel reads
+  a validated block size and resident blocks-per-multiprocessor from
+  `CYCLE_ENUM_CUDA_BLOCK_SIZE` and `CYCLE_ENUM_CUDA_BLOCKS_PER_SM`, a sweep script
+  records the best timing per combination with a total-cycle correctness guard,
+  and the reader's defaults, overrides, and validation are unit tested.
 
 ### Notes
 

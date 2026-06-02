@@ -4,7 +4,9 @@
 #include "cycle_enum/cuda/cuda_graph.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <stdexcept>
+#include <string>
 
 /**
  * @file cuda_work_queue.cpp
@@ -19,6 +21,42 @@
 #endif
 
 namespace cycle_enum::cuda {
+
+namespace {
+
+unsigned int read_positive_env(const char* name, const unsigned int fallback) {
+  const char* raw = std::getenv(name);
+  if (raw == nullptr || raw[0] == '\0') {
+    return fallback;
+  }
+
+  try {
+    const long parsed = std::stol(std::string(raw));
+    if (parsed <= 0 || parsed > 1000000) {
+      throw std::invalid_argument(std::string(name) + " is out of range");
+    }
+    return static_cast<unsigned int>(parsed);
+  } catch (const std::invalid_argument&) {
+    throw std::invalid_argument(std::string(name) + " must be a positive integer");
+  } catch (const std::out_of_range&) {
+    throw std::invalid_argument(std::string(name) + " is out of range");
+  }
+}
+
+}  // namespace
+
+WorkQueueTuning work_queue_tuning_from_env() {
+  WorkQueueTuning tuning;
+  tuning.block_size = read_positive_env("CYCLE_ENUM_CUDA_BLOCK_SIZE", 128);
+  tuning.blocks_per_sm = read_positive_env("CYCLE_ENUM_CUDA_BLOCKS_PER_SM", 16);
+
+  if (tuning.block_size % 32 != 0) {
+    throw std::invalid_argument(
+        "CYCLE_ENUM_CUDA_BLOCK_SIZE must be a multiple of the warp size (32)");
+  }
+
+  return tuning;
+}
 
 WorkQueueLaunch plan_work_queue_launch(const std::size_t work_item_count,
                                        const unsigned int block_size,
