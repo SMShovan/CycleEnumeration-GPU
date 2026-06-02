@@ -214,6 +214,12 @@ intended to preserve enough technical context for a later project report.
   rest as continuation work items. The decomposition is exact: a unit test models
   the device continuation and confirms the recombined histogram equals the
   sequential Johnson count across cutoff depths and a bounded-length case.
+- Added CUDA visited-set primitives. A header-only bitset over a caller-provided
+  word array carries host and device qualifiers so it runs in registers or
+  shared memory on the GPU and is unit tested on the host, alongside a mode
+  selector that picks the bitset for graphs whose word array fits a tunable
+  threshold and the sparse path scan otherwise. Bit operations are tested across
+  word boundaries and for clear-all and mode selection.
 
 ### Notes
 
