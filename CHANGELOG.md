@@ -246,6 +246,10 @@ intended to preserve enough technical context for a later project report.
   one-root-per-thread kernel available for debugging. Added a CUDA strategy
   design note, documented the scheduler in the README, and covered scheduler
   parsing and the unavailable-backend path with CLI tests.
+- Documented the benchmark datasets. A datasets manifest records the temporal
+  edge-list format, the in-repository fixtures, and the rules for external
+  graphs, and a git-ignored `benchmarks/data/` directory holds local datasets so
+  large or licensed graphs never enter version control.
 
 ### Notes
 

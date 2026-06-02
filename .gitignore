@@ -47,3 +47,7 @@ benchmarks/results/
 *.nvvp
 *.ncu-rep
 
+# Local benchmark datasets (keep the directory README only)
+benchmarks/data/*
+!benchmarks/data/README.md
+
