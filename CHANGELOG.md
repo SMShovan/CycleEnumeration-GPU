@@ -226,6 +226,10 @@ intended to preserve enough technical context for a later project report.
   count instead of branching over duplicate events. This implements the host half
   of the hybrid bundling decision and is unit tested for count preservation,
   per-edge ordering, and offset consistency.
+- Documented the CUDA cycle-union placement decision. Host preprocessing is kept
+  because it is already validated, overlaps with device execution, and has no
+  measured bottleneck; the note records the concrete profiling criteria that
+  would justify moving the reachability pass onto the GPU.
 
 ### Notes
 
