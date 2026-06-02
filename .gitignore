@@ -41,7 +41,8 @@ docs/doxygen/html/
 docs/doxygen/latex/
 
 # Benchmark and profiling artifacts
-benchmarks/results/
+benchmarks/results/*
+!benchmarks/results/README.md
 *.nsys-rep
 *.qdrep
 *.nvvp

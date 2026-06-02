@@ -41,3 +41,52 @@ performance numbers.
 Benchmark scripts should compare histograms before reporting speedups. A faster
 implementation with a mismatched histogram is treated as incorrect, not as a
 performance result.
+
+## Final Validation Summary
+
+### Host-side test coverage
+
+Beyond the sequential and OpenMP parity suites, the host-side building blocks of
+the CUDA backend are unit tested on the development machine:
+
+- Graph packing into the structure-of-arrays device layout.
+- Start-event generation and the temporal cycle-union prefilter, checked against
+  an independent temporal-reachability reference so it never drops a cyclic start
+  edge.
+- Branch-split decomposition, checked to recombine exactly to the sequential
+  Johnson count across cutoff depths and a bounded-length case.
+- Timestamp grouping (count preservation, per-edge ordering, offset
+  consistency).
+- Bitset visited-set operations across word boundaries and the mode selector.
+- The work-queue launch planner and the environment-driven launch tuning reader.
+- The NVTX scoped-range no-op path and the CLI scheduler option.
+
+The OpenMP task experiment is additionally validated under a real OpenMP runtime
+for histogram parity at several thread counts and cutoff depths.
+
+### GPU validation (cluster)
+
+Kernel compilation, GPU correctness parity against the sequential matrix, and
+timing are performed on the NVIDIA H100 cluster, since the development machine has
+no CUDA device. The naive and work-queue static paths, the time-window path, and
+the temporal path are each checked against the sequential counter on small and
+medium fixtures before any performance number is recorded.
+
+### Benchmark environment to record
+
+For every reported result, record the graph name and size (vertices, directed
+edges, timestamped events), both build configurations, the CPU and GPU models,
+the compiler and CUDA versions, the thread counts and CUDA launch configuration,
+and the Slurm allocation. The benchmark CSV preserves the exact command line; the
+machine metadata lives in the experiment log.
+
+### Known limitations
+
+- CUDA modes use a configurable maximum cycle length to bound device stacks; they
+  do not yet support unbounded depth.
+- The work-queue and branch-split optimizations currently target the static
+  path; the time-window and temporal paths use the naive kernels with the host
+  prefilter.
+- Cycle listing is out of scope; the project reports histograms only.
+- GPU performance numbers are produced on the cluster and are not part of the
+  local test suite.

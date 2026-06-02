@@ -279,6 +279,11 @@ intended to preserve enough technical context for a later project report.
   the coarse-grained OpenMP scheme with its fine-grained task experiment, and
   explain how the implementation differs from the paper's TBB approach. Together
   with the CUDA strategy note they complete the design-note set.
+- Added a final validation summary. The validation note now records the host-side
+  test coverage of the CUDA building blocks, the cluster GPU validation policy,
+  the benchmark environment to capture, and the known limitations, and a tracked
+  results README documents what lands in the results directory and the
+  correctness-before-performance rule.
 
 ### Notes
 
