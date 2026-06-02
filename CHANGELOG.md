@@ -266,6 +266,10 @@ intended to preserve enough technical context for a later project report.
   CLI and the baseline on the same input, normalizes both histograms, and reports
   MATCH or MISMATCH. The script's normalization, match, and error paths were
   exercised locally with a replayed baseline histogram.
+- Completed the README build and usage workflow. It now documents the cycle
+  modes, algorithm families, and execution backends, lists the CMake build
+  options, and gives sequential, OpenMP, and CUDA CLI examples, and the status
+  summary reflects the CUDA optimization work.
 
 ### Notes
 

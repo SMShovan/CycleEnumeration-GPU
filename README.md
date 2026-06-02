@@ -10,6 +10,44 @@ SPAA 2022 paper "Scalable Fine-Grained Parallel Cycle Enumeration Algorithms".
 This repository does not use MPI or distributed execution; scalability work is
 focused on CPU threading and one-GPU execution.
 
+## Algorithms and Backends
+
+The project counts directed cycles by length under three semantics, selected with
+`--mode`:
+
+- `simple` — simple cycles, ignoring time.
+- `simple-time-window` — simple cycles whose edges each have a timestamp inside
+  the start edge's `[t0, t0 + window]` interval; edge order is not constrained.
+- `temporal` — cycles whose edge timestamps strictly increase within the window.
+
+Two algorithm families are implemented, plus a brute-force oracle used to
+validate them, selected with `--algorithm`:
+
+- `johnson` — blocked-set/blocked-list depth-first search.
+- `read-tarjan` — path-extension search.
+- `brute-force` — exhaustive oracle for small graphs (sequential only).
+
+Three execution backends are selected with `--backend`:
+
+- `sequential` — single-threaded reference for every mode and algorithm.
+- `openmp` — CPU-parallel Johnson and Read-Tarjan (simple and temporal).
+- `cuda` — single-GPU Johnson for simple, time-window, and temporal modes; the
+  static path defaults to the persistent work-queue scheduler.
+
+Each cycle is counted once, rooted at its smallest vertex. See
+`docs/design/` for the per-algorithm design notes and the validation matrix.
+
+## Build Options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `CYCLE_ENUM_BUILD_TESTS` | ON | Build Google Test unit and integration tests |
+| `CYCLE_ENUM_BUILD_BENCHMARKS` | OFF | Add the benchmark smoke target |
+| `CYCLE_ENUM_ENABLE_OPENMP` | OFF | Enable OpenMP CPU backends |
+| `CYCLE_ENUM_ENABLE_CUDA` | OFF | Enable CUDA GPU backends |
+| `CYCLE_ENUM_ENABLE_DOXYGEN` | OFF | Add the Doxygen documentation target |
+| `CYCLE_ENUM_ENABLE_SANITIZERS` | OFF | Build with address/undefined sanitizers |
+
 ## Planned Implementation Path
 
 1. Build a conventional CMake project with Google Test, CTest, and Doxygen.
@@ -28,10 +66,15 @@ focused on CPU threading and one-GPU execution.
 
 The repository has the foundation, temporal graph parser, CSR/CSC graph view,
 histogram utilities, timestamp helpers, exact sequential counters, OpenMP CPU
-baselines, and bounded CUDA Johnson baselines. The `cycle-enum`
-command-line driver can run sequential and OpenMP static/temporal Johnson and
-Read-Tarjan counters, and can dispatch the current CUDA static, simple
-time-window, and temporal Johnson backends when built on an NVIDIA CUDA system.
+baselines (including a fine-grained task experiment), and CUDA Johnson backends.
+The CUDA path adds a structure-of-arrays device layout, a host cycle-union
+prefilter, a persistent work-queue scheduler, host-side branch splitting and
+timestamp grouping, bitset visited sets, NVTX profiling hooks, and env-tunable
+launch parameters. The `cycle-enum` command-line driver runs sequential and
+OpenMP static/temporal Johnson and Read-Tarjan counters, and dispatches the CUDA
+static, simple time-window, and temporal Johnson backends when built on an
+NVIDIA CUDA system. Host-side logic is unit tested locally; GPU kernel
+correctness and timing are validated on an H100 cluster.
 
 CUDA runtime detection is wired into the build as an optional target. On
 non-CUDA machines it compiles as an unavailable backend; on NVIDIA systems,
@@ -74,6 +117,22 @@ Example sequential run:
   --algorithm johnson \
   --mode simple-time-window \
   --time-window 3600
+```
+
+Example OpenMP run (requires an OpenMP-enabled build):
+
+```sh
+./build/cycle-enum --input tests/data/reference_sample.txt \
+  --backend openmp --algorithm johnson --mode temporal \
+  --time-window 3600 --openmp-threads 16
+```
+
+Example CUDA run (requires a CUDA-enabled build on an NVIDIA system):
+
+```sh
+./build-cuda/cycle-enum --input tests/data/reference_sample.txt \
+  --backend cuda --algorithm johnson --mode simple \
+  --max-cycle-length 6 --cuda-device 0 --cuda-scheduler work-queue
 ```
 
 The output uses the baseline-compatible histogram format:
