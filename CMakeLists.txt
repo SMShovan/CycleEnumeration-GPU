@@ -172,6 +172,7 @@ if(CYCLE_ENUM_ENABLE_CUDA)
 endif()
 
 add_library(cycle_enum_cuda
+  src/cuda/cuda_branch_split.cpp
   src/cuda/cuda_config.cpp
   src/cuda/cuda_graph.cpp
   src/cuda/cuda_johnson.cpp

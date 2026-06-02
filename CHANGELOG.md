@@ -208,6 +208,12 @@ intended to preserve enough technical context for a later project report.
   grid to the device, capped by the work-item count, is unit tested, and the
   unavailable-backend and argument-validation paths are checked locally; device
   parity with the naive static counter is validated on the cluster.
+- Added host-side CUDA branch splitting. It decomposes the static search into
+  many short path-prefix work items so a few heavy roots no longer dominate the
+  device, counting cycles shorter than the cutoff on the host and emitting the
+  rest as continuation work items. The decomposition is exact: a unit test models
+  the device continuation and confirms the recombined histogram equals the
+  sequential Johnson count across cutoff depths and a bounded-length case.
 
 ### Notes
 
