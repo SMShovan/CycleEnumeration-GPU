@@ -190,6 +190,11 @@ intended to preserve enough technical context for a later project report.
   temporal-reachability reference, so it never removes a start edge that can
   close a cycle. The naive time-window and temporal kernels now consume the
   host-built events instead of regenerating them on the device.
+- Added a CUDA temporal path-bundling investigation note. It evaluates on-GPU,
+  host-only, and hybrid bundling and selects a hybrid that groups duplicate edge
+  timestamps on the host and carries a device-side multiplicity scalar, deferring
+  full path-dependent bundling until profiling justifies its unbounded per-thread
+  state. The decision is recorded for the Phase 8 timestamp-lookup work.
 
 ### Notes
 
