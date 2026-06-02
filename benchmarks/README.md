@@ -37,6 +37,32 @@ cmake -S . -B build-bench -DCYCLE_ENUM_BUILD_BENCHMARKS=ON
 cmake --build build-bench --target cycle_enum_benchmark_smoke
 ```
 
+## OpenMP CPU Scaling Sweep
+
+`scripts/run_openmp_benchmarks.sh` configures a CPU-only OpenMP build and runs
+the sequential path against the OpenMP backend across a thread-count sweep,
+writing one CSV. It is environment-variable driven, like the H100 script:
+
+```sh
+THREAD_LIST="1 2 4 8 16" \
+ALGORITHMS="johnson read-tarjan" \
+benchmarks/scripts/run_openmp_benchmarks.sh
+```
+
+On macOS, where Apple Clang needs explicit libomp hints, pass them through
+`OPENMP_CMAKE_ARGS`:
+
+```sh
+OPENMP_CMAKE_ARGS="-DCMAKE_CXX_FLAGS=-I$(brew --prefix libomp)/include \
+  -DOpenMP_CXX_FLAGS=-Xclang;-fopenmp -DOpenMP_CXX_LIB_NAMES=omp \
+  -DOpenMP_omp_LIBRARY=$(brew --prefix libomp)/lib/libomp.dylib" \
+benchmarks/scripts/run_openmp_benchmarks.sh
+```
+
+`BUILD_DIR`, `MODES`, `SAMPLE_INPUT`, `TIME_WINDOW`, `MAX_CYCLE_LENGTH`,
+`WARMUP`, `REPEAT`, `TIMEOUT`, and `BENCHMARK_OUTPUT` override the rest of the
+sweep.
+
 ## Cluster Sweep Example
 
 For an allocated H100 node, `scripts/h100_smoke.sh` configures a CUDA/OpenMP

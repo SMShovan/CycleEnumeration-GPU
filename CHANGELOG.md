@@ -179,6 +179,10 @@ intended to preserve enough technical context for a later project report.
   coarse-grained baseline, not the primary CPU implementation, and is validated
   for histogram parity against the sequential and coarse-grained Read-Tarjan
   counters across thread counts and cutoff depths.
+- Added an OpenMP CPU scaling benchmark script. It configures a CPU-only OpenMP
+  build and drives the benchmark harness across a thread-count sweep for the
+  sequential and OpenMP backends, so per-algorithm runtime and thread scaling
+  can be recorded in one CSV without CUDA.
 
 ### Notes
 
