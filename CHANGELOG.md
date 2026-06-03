@@ -297,6 +297,12 @@ intended to preserve enough technical context for a later project report.
   by source and target and removes duplicates so an entry's index is its
   per-phase ownership id. Ordering, deduplication, and normalization are unit
   tested.
+- Added a reproducible random batch generator. It samples deletions from existing
+  edges and insertions from non-edges, with tunable deletion and insertion
+  counts, a seed, and an optional locality window that confines changed-edge
+  endpoints to a contiguous vertex range for sweeping how local a batch is. Count
+  honoring, seed determinism, edge membership, locality confinement, and the
+  insufficient-candidate error are unit tested.
 
 ### Notes
 

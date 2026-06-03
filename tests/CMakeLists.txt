@@ -29,6 +29,7 @@ add_executable(cycle_enum_core_test
   integration/sequential_parity_test.cpp
   integration/temporal_johnson_test.cpp
   integration/temporal_read_tarjan_test.cpp
+  unit/batch_generator_test.cpp
   unit/bruteforce_test.cpp
   unit/cuda_branch_split_test.cpp
   unit/cuda_config_test.cpp

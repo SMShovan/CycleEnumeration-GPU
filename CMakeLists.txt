@@ -111,6 +111,7 @@ elseif(MSVC)
 endif()
 
 add_library(cycle_enum_dynamic
+  src/dynamic/batch_generator.cpp
   src/dynamic/edge_change.cpp
   src/engine/histogram_engine.cpp
 )
