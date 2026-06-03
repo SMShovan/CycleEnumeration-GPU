@@ -45,4 +45,14 @@ struct DirectedGraph {
                             VertexId source,
                             VertexId target);
 
+/**
+ * @brief Build a `GraphView` from a directed graph (one dummy timestamp per
+ * edge).
+ *
+ * Used to recompute the post-batch graph with the baseline counter for
+ * validation and for recompute-versus-update comparisons. Timestamps are
+ * irrelevant for static simple cycles.
+ */
+[[nodiscard]] GraphView to_graph_view(const DirectedGraph& graph);
+
 }  // namespace cycle_enum::dynamic

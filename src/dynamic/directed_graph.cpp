@@ -1,5 +1,7 @@
 #include "cycle_enum/dynamic/directed_graph.hpp"
 
+#include "cycle_enum/core/graph.hpp"
+
 #include <algorithm>
 #include <vector>
 
@@ -84,6 +86,27 @@ bool has_edge(const DirectedGraph& graph, const VertexId source,
   const auto end = graph.neighbors.begin() +
                    static_cast<std::ptrdiff_t>(graph.offsets[source + 1]);
   return std::binary_search(begin, end, target);
+}
+
+GraphView to_graph_view(const DirectedGraph& graph) {
+  std::vector<ExternalVertexId> external_ids(graph.vertex_count);
+  for (std::size_t vertex = 0; vertex < graph.vertex_count; ++vertex) {
+    external_ids[vertex] = static_cast<ExternalVertexId>(vertex);
+  }
+
+  std::vector<TemporalEdge> edges;
+  edges.reserve(graph.neighbors.size());
+  for (std::size_t source = 0; source < graph.vertex_count; ++source) {
+    for (std::size_t offset = graph.offsets[source];
+         offset < graph.offsets[source + 1]; ++offset) {
+      edges.push_back(TemporalEdge{static_cast<VertexId>(source),
+                                   graph.neighbors[offset],
+                                   std::vector<Timestamp>{0}});
+    }
+  }
+
+  return build_graph_view(
+      TemporalGraph(std::move(external_ids), std::move(edges)));
 }
 
 }  // namespace cycle_enum::dynamic

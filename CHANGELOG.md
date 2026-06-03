@@ -310,6 +310,14 @@ intended to preserve enough technical context for a later project report.
   builds from a view, supports edge lookup, and applies a batch to produce the
   post-batch graph. Cycle counting, length bounding, ownership pruning, edge
   lookup, and batch application are unit tested.
+- Added the sequential incremental update of a static simple-cycle histogram. It
+  applies a batch as delete-then-insert with edge-id ownership, subtracting
+  cycles through each deleted edge in the initial graph and adding cycles through
+  each inserted edge in the post-batch graph, attributing each affected cycle to
+  its smallest-id changed edge. A directed-to-view helper recomputes the
+  post-batch graph for validation. The golden gate is a randomized property test
+  asserting the update equals a full recomputation across 200 random
+  graph-and-batch trials plus empty, all-delete, and all-insert cases.
 
 ### Fixed
 
