@@ -292,6 +292,11 @@ intended to preserve enough technical context for a later project report.
   exposes a uniform `count_histogram` entry point over the recompute baseline,
   establishing the structure that the incremental update will extend, and is
   unit tested for parity with the sequential counter.
+- Added dynamic edge-change and batch types. A change is a directed edge, a batch
+  splits changes into deletions and insertions, and normalization sorts each list
+  by source and target and removes duplicates so an entry's index is its
+  per-phase ownership id. Ordering, deduplication, and normalization are unit
+  tested.
 
 ### Notes
 
