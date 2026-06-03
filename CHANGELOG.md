@@ -338,6 +338,12 @@ intended to preserve enough technical context for a later project report.
   against a full recomputation and reports update and recompute timings, with the
   prior histogram computed untimed as cached prior knowledge. CLI update behavior
   and its argument validation are tested.
+- Added a dynamic-update benchmark sweep and an experiment guide. The sweep
+  drives the CLI's update-with-compare across batch sizes, locality windows, and
+  seeds, recording update and recompute timings, their speedup, and the
+  correctness match per case, and the guide explains how to run the
+  recompute-versus-update scalability study and read the locality-driven
+  crossover.
 
 ### Fixed
 
