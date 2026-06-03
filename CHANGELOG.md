@@ -303,6 +303,13 @@ intended to preserve enough technical context for a later project report.
   endpoints to a contiguous vertex range for sweeping how local a batch is. Count
   honoring, seed determinism, edge membership, locality confinement, and the
   insufficient-candidate error are unit tested.
+- Added the edge-anchored cycle enumeration primitive and its supporting
+  directed CSR graph. The primitive counts simple cycles through one directed
+  edge by length, bounded by a maximum length, and skips cycles owned by a
+  smaller-id changed edge to enforce single attribution. The directed graph
+  builds from a view, supports edge lookup, and applies a batch to produce the
+  post-batch graph. Cycle counting, length bounding, ownership pruning, edge
+  lookup, and batch application are unit tested.
 
 ### Notes
 

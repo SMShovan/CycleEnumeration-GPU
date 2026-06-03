@@ -40,6 +40,8 @@ add_executable(cycle_enum_core_test
   unit/cuda_visited_set_test.cpp
   unit/cuda_work_item_test.cpp
   unit/cuda_work_queue_test.cpp
+  unit/cycles_through_edge_test.cpp
+  unit/directed_graph_test.cpp
   unit/edge_change_test.cpp
   unit/cycle_union_test.cpp
   unit/graph_parser_test.cpp

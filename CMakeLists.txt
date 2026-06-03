@@ -112,6 +112,8 @@ endif()
 
 add_library(cycle_enum_dynamic
   src/dynamic/batch_generator.cpp
+  src/dynamic/cycles_through_edge.cpp
+  src/dynamic/directed_graph.cpp
   src/dynamic/edge_change.cpp
   src/engine/histogram_engine.cpp
 )
