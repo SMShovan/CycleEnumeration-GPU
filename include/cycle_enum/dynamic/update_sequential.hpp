@@ -5,6 +5,7 @@
 #include "cycle_enum/dynamic/edge_change.hpp"
 
 #include <cstddef>
+#include <vector>
 
 /**
  * @file update_sequential.hpp
@@ -42,6 +43,19 @@ namespace cycle_enum::dynamic {
     const DirectedGraph& initial_graph,
     const CycleHistogram& initial_histogram,
     const EdgeBatch& batch,
+    std::size_t max_cycle_length);
+
+/**
+ * @brief Apply a signed per-length delta to a histogram.
+ *
+ * Lengths beyond `max_cycle_length` are kept unchanged. Shared by the
+ * sequential and parallel updates so the delta-application rule is identical.
+ *
+ * @throws std::logic_error if any resulting bucket would be negative.
+ */
+[[nodiscard]] CycleHistogram apply_histogram_delta(
+    const CycleHistogram& base,
+    const std::vector<long long>& delta,
     std::size_t max_cycle_length);
 
 }  // namespace cycle_enum::dynamic

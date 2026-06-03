@@ -24,6 +24,7 @@ add_executable(cycle_enum_core_test
   integration/path_bundling_test.cpp
   integration/cli_sequential_test.cpp
   integration/cuda_johnson_test.cpp
+  integration/dynamic_update_openmp_test.cpp
   integration/dynamic_update_parity_test.cpp
   integration/read_tarjan_static_test.cpp
   integration/read_tarjan_time_window_test.cpp

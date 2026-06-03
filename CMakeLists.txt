@@ -115,6 +115,7 @@ add_library(cycle_enum_dynamic
   src/dynamic/cycles_through_edge.cpp
   src/dynamic/directed_graph.cpp
   src/dynamic/edge_change.cpp
+  src/dynamic/update_openmp.cpp
   src/dynamic/update_sequential.cpp
   src/engine/histogram_engine.cpp
 )
@@ -124,6 +125,7 @@ add_library(cycle_enum::dynamic ALIAS cycle_enum_dynamic)
 target_link_libraries(cycle_enum_dynamic
   PUBLIC
     cycle_enum::core
+    cycle_enum::openmp
     cycle_enum::sequential
 )
 

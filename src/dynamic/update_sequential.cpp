@@ -61,12 +61,18 @@ CycleHistogram update_static_histogram(const DirectedGraph& initial_graph,
   accumulate_phase(final_graph, normalized.insertions, max_cycle_length, +1,
                    delta);
 
-  // Apply deltas to the prior histogram. Lengths beyond the cap are untouched.
+  return apply_histogram_delta(initial_histogram, delta, max_cycle_length);
+}
+
+CycleHistogram apply_histogram_delta(const CycleHistogram& base,
+                                     const std::vector<long long>& delta,
+                                     const std::size_t max_cycle_length) {
   std::map<CycleHistogram::Length, long long> totals;
-  for (const auto& [length, count] : initial_histogram.entries()) {
+  for (const auto& [length, count] : base.entries()) {
     totals[length] = static_cast<long long>(count);
   }
-  for (std::size_t length = 2; length <= max_cycle_length; ++length) {
+  for (std::size_t length = 2;
+       length <= max_cycle_length && length < delta.size(); ++length) {
     if (delta[length] != 0) {
       totals[static_cast<CycleHistogram::Length>(length)] += delta[length];
     }

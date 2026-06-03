@@ -318,6 +318,12 @@ intended to preserve enough technical context for a later project report.
   post-batch graph for validation. The golden gate is a randomized property test
   asserting the update equals a full recomputation across 200 random
   graph-and-batch trials plus empty, all-delete, and all-insert cases.
+- Added the OpenMP-parallel incremental update. Each phase parallelizes over its
+  changed edges into per-thread deltas reduced after the phase; edge-id ownership
+  keeps the parallel work coordination-free. It matches the sequential update and
+  a full recomputation across random trials at several thread counts, and falls
+  back to the sequential update without an OpenMP runtime. The delta-application
+  step is shared between the sequential and parallel updates.
 
 ### Fixed
 
