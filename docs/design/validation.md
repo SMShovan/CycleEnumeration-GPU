@@ -80,8 +80,30 @@ the compiler and CUDA versions, the thread counts and CUDA launch configuration,
 and the Slurm allocation. The benchmark CSV preserves the exact command line; the
 machine metadata lives in the experiment log.
 
+### Dynamic update correctness gate
+
+The incremental update is validated entirely on the host against full
+recomputation, which is the same oracle used for the static counters:
+
+- A randomized property test asserts that the sequential update equals a full
+  recomputation across 200 random graph-and-batch trials, plus empty, all-delete,
+  and all-insert batches.
+- The OpenMP update is checked against both the sequential update and a full
+  recomputation at several thread counts.
+- The CUDA update's host dispatch and unavailable-backend path are tested
+  locally; its device parity against full recomputation is validated on the
+  cluster and skips cleanly without a device.
+- The enumeration primitive, batch generator, edge-change types, and directed
+  graph mutation have their own unit tests.
+
+Discovering this gate also surfaced and fixed a latent bug in the length-bounded
+baseline Johnson counter (see the changelog); a randomized regression test now
+compares bounded Johnson against the brute-force oracle.
+
 ### Known limitations
 
+- The incremental update covers static simple cycles only; time-window and
+  temporal updates are not yet implemented.
 - CUDA modes use a configurable maximum cycle length to bound device stacks; they
   do not yet support unbounded depth.
 - The work-queue and branch-split optimizations currently target the static

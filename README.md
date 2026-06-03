@@ -146,6 +146,30 @@ The output uses the baseline-compatible histogram format:
 Total, 5
 ```
 
+## Dynamic Histogram Update
+
+Beyond recomputing a histogram from scratch, the project can **incrementally
+update** a known static simple-cycle histogram under a batch of edge insertions
+and deletions, touching only the cycles through the changed edges. The batch is
+applied as delete-then-insert with edge-id ownership, which makes the work
+order-independent and parallel across changed edges. The update is available on
+the sequential, OpenMP, and CUDA backends and always produces the same histogram
+as a full recomputation. See `docs/design/dynamic_update.md` for the algorithm.
+
+The CLI exposes it through `--task update`, with a generated random batch:
+
+```sh
+./build/cycle-enum --input tests/data/reference_sample.txt \
+  --task update --backend sequential --mode simple \
+  --max-cycle-length 6 --deletes 4 --inserts 4 --batch-seed 1 \
+  --compare-recompute
+```
+
+`--compare-recompute` verifies the update against a full recomputation and
+reports both timings. For the recompute-versus-update scalability study (the
+locality-driven crossover), see `docs/EXPERIMENTS.md` and
+`benchmarks/scripts/run_dynamic_benchmarks.py`.
+
 ## Target Platform
 
 Development starts on macOS, where CUDA kernels cannot be executed locally.

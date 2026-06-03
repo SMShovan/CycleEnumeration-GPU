@@ -349,6 +349,10 @@ intended to preserve enough technical context for a later project report.
   allocation and reset, and the post-batch graph construction rebuilds only the
   source vertices the batch touches while copying every other sorted neighbor
   range directly. Both are covered by the existing parity tests.
+- Documented the dynamic update in the README and validation notes: a feature
+  overview with a CLI example and a pointer to the experiment guide, and a
+  dynamic correctness-gate section recording the recompute-equality validation
+  across backends.
 
 ### Fixed
 
