@@ -344,6 +344,11 @@ intended to preserve enough technical context for a later project report.
   correctness match per case, and the guide explains how to run the
   recompute-versus-update scalability study and read the locality-driven
   crossover.
+- Optimized the incremental update. The edge-anchored search reuses a per-thread
+  visited buffer that stays zero between changed edges, avoiding a per-edge
+  allocation and reset, and the post-batch graph construction rebuilds only the
+  source vertices the batch touches while copying every other sorted neighbor
+  range directly. Both are covered by the existing parity tests.
 
 ### Fixed
 

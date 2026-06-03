@@ -48,7 +48,19 @@ DirectedGraph build_directed_graph(const GraphView& view) {
 }
 
 DirectedGraph apply_batch(const DirectedGraph& base, const EdgeBatch& batch) {
-  std::vector<std::vector<VertexId>> adjacency(base.vertex_count);
+  // Only the source vertices the batch touches need rebuilding and re-sorting;
+  // every other vertex's already-sorted neighbor range is copied verbatim.
+  std::vector<char> touched(base.vertex_count, 0);
+  for (const EdgeChange& deletion : batch.deletions) {
+    if (deletion.source < base.vertex_count) {
+      touched[deletion.source] = 1;
+    }
+  }
+  for (const EdgeChange& insertion : batch.insertions) {
+    if (insertion.source < base.vertex_count) {
+      touched[insertion.source] = 1;
+    }
+  }
 
   std::vector<EdgeChange> deletions = batch.deletions;
   std::sort(deletions.begin(), deletions.end());
@@ -57,23 +69,54 @@ DirectedGraph apply_batch(const DirectedGraph& base, const EdgeBatch& batch) {
                               EdgeChange{source, target});
   };
 
+  std::vector<std::vector<VertexId>> rebuilt(base.vertex_count);
   for (std::size_t source = 0; source < base.vertex_count; ++source) {
+    if (touched[source] == 0) {
+      continue;
+    }
+    std::vector<VertexId>& row = rebuilt[source];
     for (std::size_t offset = base.offsets[source];
          offset < base.offsets[source + 1]; ++offset) {
       const VertexId target = base.neighbors[offset];
       if (!is_deleted(static_cast<VertexId>(source), target)) {
-        adjacency[source].push_back(target);
+        row.push_back(target);
       }
     }
+    for (const EdgeChange& insertion : batch.insertions) {
+      if (insertion.source == source) {
+        row.push_back(insertion.target);
+      }
+    }
+    std::sort(row.begin(), row.end());
+    row.erase(std::unique(row.begin(), row.end()), row.end());
   }
 
-  for (const EdgeChange& insertion : batch.insertions) {
-    if (insertion.source < base.vertex_count) {
-      adjacency[insertion.source].push_back(insertion.target);
+  DirectedGraph graph;
+  graph.vertex_count = base.vertex_count;
+  graph.offsets.assign(base.vertex_count + 1, 0);
+  for (std::size_t source = 0; source < base.vertex_count; ++source) {
+    const std::size_t degree =
+        touched[source] != 0
+            ? rebuilt[source].size()
+            : base.offsets[source + 1] - base.offsets[source];
+    graph.offsets[source + 1] = graph.offsets[source] + degree;
+  }
+
+  graph.neighbors.resize(graph.offsets.back());
+  for (std::size_t source = 0; source < base.vertex_count; ++source) {
+    VertexId* out = graph.neighbors.data() + graph.offsets[source];
+    if (touched[source] != 0) {
+      std::copy(rebuilt[source].begin(), rebuilt[source].end(), out);
+    } else {
+      std::copy(base.neighbors.begin() +
+                    static_cast<std::ptrdiff_t>(base.offsets[source]),
+                base.neighbors.begin() +
+                    static_cast<std::ptrdiff_t>(base.offsets[source + 1]),
+                out);
     }
   }
 
-  return build_from_lists(std::move(adjacency));
+  return graph;
 }
 
 bool has_edge(const DirectedGraph& graph, const VertexId source,

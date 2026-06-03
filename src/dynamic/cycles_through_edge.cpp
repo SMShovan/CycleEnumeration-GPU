@@ -90,11 +90,21 @@ void count_cycles_through_edge(const DirectedGraph& graph,
     return;
   }
 
-  std::vector<char> visited(graph.vertex_count, 0);
+  // Reuse a per-thread visited buffer across calls. The search restores every
+  // vertex it touches on backtrack, so the buffer stays all-zero between calls
+  // once the anchored source and target are cleared below. This avoids an
+  // O(vertex_count) allocation and reset per changed edge.
+  static thread_local std::vector<char> visited;
+  if (visited.size() < graph.vertex_count) {
+    visited.assign(graph.vertex_count, 0);
+  }
+
   visited[source] = 1;
   visited[target] = 1;
   search(graph, source, target, owner_id, phase_changes, max_length, target,
          1, visited, counts);
+  visited[source] = 0;
+  visited[target] = 0;
 }
 
 }  // namespace cycle_enum::dynamic
