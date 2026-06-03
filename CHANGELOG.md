@@ -331,6 +331,13 @@ intended to preserve enough technical context for a later project report.
   signed delta. The host dispatch, argument validation, and unavailable-backend
   path are tested locally; device parity against a full recomputation is
   validated on the H100 cluster and skips cleanly without a device.
+- Added a uniform engine `update_histogram` dispatch over the sequential,
+  OpenMP, and CUDA updates, and exposed the incremental update in the CLI through
+  `--task update` with `--deletes`, `--inserts`, `--batch-seed`, and
+  `--batch-locality` batch controls. `--compare-recompute` checks the update
+  against a full recomputation and reports update and recompute timings, with the
+  prior histogram computed untimed as cached prior knowledge. CLI update behavior
+  and its argument validation are tested.
 
 ### Fixed
 

@@ -320,6 +320,60 @@ TEST(CliCudaTest, TemporalReportsUnavailableBackendWhenNotCompiled) {
   EXPECT_NE(output.find("CUDA support is not compiled"), std::string::npos);
 }
 
+TEST(CliUpdateTest, UpdateMatchesRecompute) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input", data_path("reference_sample.txt"),
+          "--task", "update",
+          "--backend", "sequential",
+          "--mode", "simple",
+          "--max-cycle-length", "6",
+          "--deletes", "2",
+          "--inserts", "2",
+          "--batch-seed", "7",
+          "--compare-recompute",
+      },
+      status);
+
+  EXPECT_EQ(status, 0);
+  EXPECT_NE(output.find("match=yes"), std::string::npos);
+  EXPECT_NE(output.find("# cycle_size, num_of_cycles"), std::string::npos);
+}
+
+TEST(CliUpdateTest, RequiresMaxCycleLength) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input", data_path("reference_sample.txt"),
+          "--task", "update",
+          "--mode", "simple",
+          "--deletes", "1",
+      },
+      status);
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("update task requires --max-cycle-length"),
+            std::string::npos);
+}
+
+TEST(CliUpdateTest, RejectsNonSimpleMode) {
+  int status = -1;
+  const std::string output = run_cli(
+      {
+          "--input", data_path("reference_sample.txt"),
+          "--task", "update",
+          "--mode", "temporal",
+          "--time-window", "10",
+          "--max-cycle-length", "6",
+      },
+      status);
+
+  EXPECT_NE(status, 0);
+  EXPECT_NE(output.find("update task currently supports only --mode simple"),
+            std::string::npos);
+}
+
 TEST(CliCudaTest, RejectsUnknownScheduler) {
   int status = -1;
   const std::string output = run_cli(

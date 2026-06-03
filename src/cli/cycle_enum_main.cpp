@@ -4,6 +4,10 @@
 #include "cycle_enum/core/version.hpp"
 #include "cycle_enum/cuda/cuda_johnson.hpp"
 #include "cycle_enum/cuda/cuda_work_queue.hpp"
+#include "cycle_enum/dynamic/batch_generator.hpp"
+#include "cycle_enum/dynamic/directed_graph.hpp"
+#include "cycle_enum/dynamic/edge_change.hpp"
+#include "cycle_enum/engine/histogram_engine.hpp"
 #include "cycle_enum/openmp/openmp_johnson.hpp"
 #include "cycle_enum/openmp/openmp_read_tarjan.hpp"
 #include "cycle_enum/openmp/openmp_temporal_johnson.hpp"
@@ -15,6 +19,8 @@
 #include "cycle_enum/sequential/temporal_read_tarjan.hpp"
 
 #include <charconv>
+#include <chrono>
+#include <cstdint>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -35,11 +41,18 @@ namespace {
 // path; naive stays available for debugging and parity checks.
 enum class CudaScheduler { Naive, WorkQueue };
 
+// Whether to recompute a histogram from scratch or incrementally update a prior
+// one under a generated batch of edge changes.
+enum class Task { Count, Update };
+
 struct CliConfig {
   std::filesystem::path input_path;
   cycle_enum::CycleEnumerationOptions options =
       cycle_enum::default_options();
   CudaScheduler cuda_scheduler = CudaScheduler::WorkQueue;
+  Task task = Task::Count;
+  cycle_enum::dynamic::BatchParams batch_params;
+  bool compare_recompute = false;
   bool show_help = false;
   bool show_version = false;
 };
@@ -55,8 +68,23 @@ void print_usage(std::ostream& out) {
       << "  --openmp-threads <positive integer>\n"
       << "  --cuda-device <non-negative integer>\n"
       << "  --cuda-scheduler <naive|work-queue>\n"
+      << "  --task <count|update>\n"
+      << "  --deletes <count>  --inserts <count>  (update task)\n"
+      << "  --batch-seed <integer>  --batch-locality <window>  (update task)\n"
+      << "  --compare-recompute  (update task: verify against full recompute)\n"
       << "  --help\n"
       << "  --version\n";
+}
+
+[[nodiscard]] std::optional<Task> parse_task(
+    const std::string_view value) noexcept {
+  if (value == "count" || value == "recompute") {
+    return Task::Count;
+  }
+  if (value == "update" || value == "incremental") {
+    return Task::Update;
+  }
+  return std::nullopt;
 }
 
 [[nodiscard]] std::optional<CudaScheduler> parse_cuda_scheduler(
@@ -292,6 +320,77 @@ template <typename Integer>
       continue;
     }
 
+    if (option == "--task") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto task = parse_task(*value);
+      if (!task.has_value()) {
+        err << "unknown task: " << *value << '\n';
+        return std::nullopt;
+      }
+      config.task = *task;
+      continue;
+    }
+
+    if (option == "--deletes" || option == "--deletions") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<std::size_t>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.batch_params.num_deletions = *parsed;
+      continue;
+    }
+
+    if (option == "--inserts" || option == "--insertions") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<std::size_t>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.batch_params.num_insertions = *parsed;
+      continue;
+    }
+
+    if (option == "--batch-seed") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<std::uint64_t>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.batch_params.seed = *parsed;
+      continue;
+    }
+
+    if (option == "--batch-locality") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<std::size_t>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.batch_params.locality_window = *parsed;
+      continue;
+    }
+
+    if (option == "--compare-recompute") {
+      config.compare_recompute = true;
+      continue;
+    }
+
     if (option == "--time-window" || option == "--window") {
       const auto value = next_value(args, index, option, err);
       if (!value.has_value()) {
@@ -344,6 +443,21 @@ template <typename Integer>
       err << error << '\n';
     }
     return std::nullopt;
+  }
+
+  if (config.task == Task::Update) {
+    bool ok = true;
+    if (config.options.mode != cycle_enum::CycleMode::Simple) {
+      err << "update task currently supports only --mode simple\n";
+      ok = false;
+    }
+    if (!config.options.max_cycle_length.has_value()) {
+      err << "update task requires --max-cycle-length\n";
+      ok = false;
+    }
+    if (!ok) {
+      return std::nullopt;
+    }
   }
 
   return config;
@@ -486,6 +600,64 @@ template <typename Integer>
   throw std::logic_error("unsupported execution backend");
 }
 
+[[nodiscard]] cycle_enum::engine::UpdateBackend to_update_backend(
+    const cycle_enum::ExecutionPolicy execution) {
+  switch (execution) {
+    case cycle_enum::ExecutionPolicy::Sequential:
+      return cycle_enum::engine::UpdateBackend::Sequential;
+    case cycle_enum::ExecutionPolicy::OpenMP:
+      return cycle_enum::engine::UpdateBackend::OpenMP;
+    case cycle_enum::ExecutionPolicy::Cuda:
+      return cycle_enum::engine::UpdateBackend::Cuda;
+  }
+  throw std::logic_error("unsupported update backend");
+}
+
+// Run the incremental update task. The prior histogram is computed first and is
+// not timed (it is the cached prior knowledge a streaming caller already has);
+// only the update itself is timed. Timing and the optional recompute comparison
+// are written to `info` so stdout stays the histogram.
+[[nodiscard]] cycle_enum::CycleHistogram run_update(
+    const cycle_enum::GraphView& view,
+    const CliConfig& config,
+    std::ostream& info) {
+  using Clock = std::chrono::steady_clock;
+  const auto seconds = [](const Clock::duration d) {
+    return std::chrono::duration<double>(d).count();
+  };
+
+  const std::size_t max_length = *config.options.max_cycle_length;
+  const cycle_enum::CycleHistogram prior =
+      cycle_enum::engine::count_histogram(view, max_length);
+  const cycle_enum::dynamic::DirectedGraph initial_graph =
+      cycle_enum::dynamic::build_directed_graph(view);
+  const cycle_enum::dynamic::EdgeBatch batch =
+      cycle_enum::dynamic::generate_batch(view, config.batch_params);
+
+  const auto update_start = Clock::now();
+  cycle_enum::CycleHistogram updated = cycle_enum::engine::update_histogram(
+      to_update_backend(config.options.execution), initial_graph, prior, batch,
+      max_length, config.options.openmp_threads, config.options.cuda_device_id);
+  const double update_seconds = seconds(Clock::now() - update_start);
+
+  info << "deletions=" << batch.deletions.size()
+       << " insertions=" << batch.insertions.size() << '\n';
+  info << "update_seconds=" << update_seconds << '\n';
+
+  if (config.compare_recompute) {
+    const cycle_enum::GraphView final_view = cycle_enum::dynamic::to_graph_view(
+        cycle_enum::dynamic::apply_batch(initial_graph, batch));
+    const auto recompute_start = Clock::now();
+    const cycle_enum::CycleHistogram recomputed =
+        cycle_enum::engine::count_histogram(final_view, max_length);
+    const double recompute_seconds = seconds(Clock::now() - recompute_start);
+    info << "recompute_seconds=" << recompute_seconds << '\n';
+    info << "match=" << (updated == recomputed ? "yes" : "no") << '\n';
+  }
+
+  return updated;
+}
+
 }  // namespace
 
 /**
@@ -514,7 +686,9 @@ int main(int argc, char** argv) {
         cycle_enum::read_temporal_graph(config->input_path);
     const cycle_enum::GraphView view = cycle_enum::build_graph_view(parsed);
     const cycle_enum::CycleHistogram histogram =
-        run_backend(view, config->options, config->cuda_scheduler);
+        config->task == Task::Update
+            ? run_update(view, *config, std::cerr)
+            : run_backend(view, config->options, config->cuda_scheduler);
     std::cout << histogram.to_csv();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
