@@ -32,12 +32,56 @@ class JohnsonSearch {
         list.clear();
       }
       path_.clear();
-      circuit(root);
+      if (max_cycle_length_.has_value()) {
+        circuit_bounded(root);
+      } else {
+        circuit(root);
+      }
     }
     return histogram_;
   }
 
  private:
+  // Length-bounded search. Johnson's blocked-list unblocking is only sound for
+  // unbounded search: when a vertex's search fails purely because the depth
+  // limit was hit, the blocked-list mechanism would keep it blocked and miss
+  // shorter cycles through it. With a length bound we therefore fall back to
+  // plain path-membership blocking, marking a vertex blocked only while it is on
+  // the current path and clearing it on every backtrack.
+  bool circuit_bounded(const VertexId vertex) {
+    path_.push_back(vertex);
+    blocked_[vertex] = 1;
+
+    bool found_cycle = false;
+    const std::size_t begin = graph_.outgoing_offsets()[vertex];
+    const std::size_t end = graph_.outgoing_offsets()[vertex + 1];
+    for (std::size_t offset = begin; offset < end; ++offset) {
+      const VertexId next = graph_.outgoing_edges()[offset].vertex;
+
+      if (next == root_ && path_.size() >= 2) {
+        histogram_.increment(static_cast<CycleHistogram::Length>(path_.size()));
+        found_cycle = true;
+        continue;
+      }
+
+      if (next <= root_ || blocked_[next] != 0) {
+        continue;
+      }
+
+      if (path_.size() >= *max_cycle_length_) {
+        continue;
+      }
+
+      if (circuit_bounded(next)) {
+        found_cycle = true;
+      }
+    }
+
+    blocked_[vertex] = 0;
+    path_.pop_back();
+    return found_cycle;
+  }
+
   bool circuit(const VertexId vertex) {
     bool found_cycle = false;
     path_.push_back(vertex);

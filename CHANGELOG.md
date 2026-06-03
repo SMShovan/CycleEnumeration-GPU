@@ -311,6 +311,17 @@ intended to preserve enough technical context for a later project report.
   post-batch graph. Cycle counting, length bounding, ownership pruning, edge
   lookup, and batch application are unit tested.
 
+### Fixed
+
+- Fixed length-bounded `count_simple_cycles_johnson` silently undercounting.
+  When `max_cycle_length` was set, the depth cutoff interacted with Johnson's
+  blocked-list unblocking so that a vertex skipped only because of the depth
+  limit stayed blocked, dropping valid shorter cycles through it. Bounded search
+  now uses plain path-membership blocking, which agrees with the brute-force
+  oracle. A randomized regression test compares bounded Johnson against the
+  oracle across caps on dense graphs. The length-bounded time-window and OpenMP
+  counters share the same pattern and should be revisited.
+
 ### Notes
 
 - CUDA kernels are guarded for non-CUDA development machines. Local validation
