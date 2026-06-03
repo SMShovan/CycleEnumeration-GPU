@@ -324,6 +324,13 @@ intended to preserve enough technical context for a later project report.
   a full recomputation across random trials at several thread counts, and falls
   back to the sequential update without an OpenMP runtime. The delta-application
   step is shared between the sequential and parallel updates.
+- Added the single-GPU CUDA incremental update. One device work item per changed
+  edge enumerates the cycles it owns through an explicit depth-first search with
+  edge-id ownership pruning via device binary search, accumulating per-length
+  counts into add-only delete and insert buffers that the host turns into a
+  signed delta. The host dispatch, argument validation, and unavailable-backend
+  path are tested locally; device parity against a full recomputation is
+  validated on the H100 cluster and skips cleanly without a device.
 
 ### Fixed
 

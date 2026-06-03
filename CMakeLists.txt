@@ -115,6 +115,7 @@ add_library(cycle_enum_dynamic
   src/dynamic/cycles_through_edge.cpp
   src/dynamic/directed_graph.cpp
   src/dynamic/edge_change.cpp
+  src/dynamic/update_cuda.cpp
   src/dynamic/update_openmp.cpp
   src/dynamic/update_sequential.cpp
   src/engine/histogram_engine.cpp
@@ -125,6 +126,7 @@ add_library(cycle_enum::dynamic ALIAS cycle_enum_dynamic)
 target_link_libraries(cycle_enum_dynamic
   PUBLIC
     cycle_enum::core
+    cycle_enum::cuda
     cycle_enum::openmp
     cycle_enum::sequential
 )
@@ -245,6 +247,18 @@ if(CYCLE_ENUM_CUDA_AVAILABLE)
   )
   target_link_libraries(cycle_enum_cuda PUBLIC CUDA::cudart)
   set_target_properties(cycle_enum_cuda
+    PROPERTIES
+      CUDA_STANDARD 17
+      CUDA_STANDARD_REQUIRED ON
+  )
+
+  # Dynamic-update device kernel, compiled only on CUDA-capable builds.
+  target_sources(cycle_enum_dynamic
+    PRIVATE
+      src/dynamic/update_cuda_kernel.cu
+  )
+  target_link_libraries(cycle_enum_dynamic PUBLIC CUDA::cudart)
+  set_target_properties(cycle_enum_dynamic
     PROPERTIES
       CUDA_STANDARD 17
       CUDA_STANDARD_REQUIRED ON
