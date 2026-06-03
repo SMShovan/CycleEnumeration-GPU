@@ -110,6 +110,34 @@ elseif(MSVC)
   target_compile_options(cycle_enum_openmp PRIVATE /W4)
 endif()
 
+add_library(cycle_enum_dynamic
+  src/engine/histogram_engine.cpp
+)
+
+add_library(cycle_enum::dynamic ALIAS cycle_enum_dynamic)
+
+target_link_libraries(cycle_enum_dynamic
+  PUBLIC
+    cycle_enum::core
+    cycle_enum::sequential
+)
+
+target_compile_features(cycle_enum_dynamic PUBLIC cxx_std_17)
+
+target_include_directories(cycle_enum_dynamic
+  PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(cycle_enum_dynamic PRIVATE -Wall -Wextra -Wpedantic)
+elseif(MSVC)
+  target_compile_options(cycle_enum_dynamic PRIVATE /W4)
+endif()
+
+cycle_enum_configure_sanitizers(cycle_enum_dynamic)
+
 add_executable(cycle_enum_cli
   src/cli/cycle_enum_main.cpp
 )
@@ -122,6 +150,7 @@ set_target_properties(cycle_enum_cli
 target_link_libraries(cycle_enum_cli
   PRIVATE
     cycle_enum::cuda
+    cycle_enum::dynamic
     cycle_enum::openmp
     cycle_enum::sequential
 )

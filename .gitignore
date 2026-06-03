@@ -10,6 +10,7 @@ PROJECT_PLAN.md
 
 # Build outputs
 build/
+build-*/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt

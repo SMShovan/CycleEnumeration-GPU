@@ -285,6 +285,14 @@ intended to preserve enough technical context for a later project report.
   results README documents what lands in the results directory and the
   correctness-before-performance rule.
 
+- Added a dynamic histogram update design note describing delete-then-insert
+  with edge-id ownership for static simple cycles, its exactness argument, and
+  the recompute-equality validation gate.
+- Added the engine facade and the `cycle_enum::dynamic` library. The facade
+  exposes a uniform `count_histogram` entry point over the recompute baseline,
+  establishing the structure that the incremental update will extend, and is
+  unit tested for parity with the sequential counter.
+
 ### Notes
 
 - CUDA kernels are guarded for non-CUDA development machines. Local validation
