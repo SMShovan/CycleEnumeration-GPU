@@ -108,9 +108,35 @@ TemporalGraph read_temporal_graph(const std::filesystem::path& path) {
 
   std::string line;
   std::size_t line_number = 0;
+
+  // Matrix Market files (".mtx") begin with a "%%MatrixMarket" banner, carry a
+  // "rows cols nnz" dimensions line before the coordinate entries, and store
+  // each edge once. We read every stored coordinate as a single directed edge
+  // (no symmetrization), so a symmetric/undirected matrix is interpreted in the
+  // orientation it was written. The optional weight column is not a timestamp.
+  bool matrix_market = false;
+  bool mm_dimensions_pending = false;
+  if (std::getline(input, line)) {
+    ++line_number;
+    if (line.rfind("%%MatrixMarket", 0) == 0) {
+      matrix_market = true;
+      mm_dimensions_pending = true;
+    } else {
+      input.clear();
+      input.seekg(0);
+      line_number = 0;
+    }
+  }
+
   while (std::getline(input, line)) {
     ++line_number;
     if (is_ignored_line(line)) {
+      continue;
+    }
+
+    if (matrix_market && mm_dimensions_pending) {
+      // The first non-comment line after the banner is the dimensions header.
+      mm_dimensions_pending = false;
       continue;
     }
 
@@ -130,9 +156,13 @@ TemporalGraph read_temporal_graph(const std::filesystem::path& path) {
           "expected at least two fields: source target [timestamp]"));
     }
 
-    // The timestamp column is optional. A present third field must be an
-    // integer timestamp; anything left over after it is a malformed row.
-    if (!(row >> timestamp)) {
+    if (matrix_market) {
+      // Matrix Market coordinates are "row col [weight]"; the weight is not a
+      // timestamp, so ignore any trailing fields and keep the default.
+      timestamp = kDefaultMissingTimestamp;
+    } else if (!(row >> timestamp)) {
+      // The timestamp column is optional. A present third field must be an
+      // integer timestamp; anything left over after it is a malformed row.
       row.clear();
       if (row >> trailing) {
         throw GraphParseError(line_error(

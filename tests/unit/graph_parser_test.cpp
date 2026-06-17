@@ -185,4 +185,32 @@ TEST(GraphParserTest, ParsesCommaSeparatedRowsWithAndWithoutTimestamp) {
   std::filesystem::remove(path);
 }
 
+TEST(GraphParserTest, ReadsMatrixMarketAsStoredDirectedEdges) {
+  const std::filesystem::path path =
+      std::filesystem::temp_directory_path() / "cycle_enum_mm.mtx";
+  {
+    std::ofstream output(path);
+    output << "%%MatrixMarket matrix coordinate pattern symmetric\n";
+    output << "% a comment line\n";
+    output << "3 3 2\n";  // dimensions header: rows cols nnz (must be skipped)
+    output << "1 2\n";
+    output << "2 3\n";
+  }
+
+  const cycle_enum::TemporalGraph graph =
+      cycle_enum::read_temporal_graph(path);
+
+  // Exactly two directed edges, no symmetrization: 1->2 and 2->3 only.
+  ASSERT_EQ(graph.vertex_count(), 3U);
+  EXPECT_EQ(graph.edge_count(), 2U);
+  EXPECT_NE(graph.find_edge(*graph.compact_id(1), *graph.compact_id(2)),
+            nullptr);
+  EXPECT_NE(graph.find_edge(*graph.compact_id(2), *graph.compact_id(3)),
+            nullptr);
+  EXPECT_EQ(graph.find_edge(*graph.compact_id(2), *graph.compact_id(1)),
+            nullptr);
+
+  std::filesystem::remove(path);
+}
+
 }  // namespace

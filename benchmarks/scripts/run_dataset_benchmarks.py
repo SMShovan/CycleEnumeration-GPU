@@ -20,8 +20,6 @@ comma- or whitespace-separated rows and fills a constant timestamp when the
 column is absent (valid because static counting ignores timestamps).
 """
 
-from __future__ import annotations
-
 import argparse
 import csv
 import datetime as dt
@@ -29,6 +27,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 # Patterns over the CLI's stderr timing report (one "key: value" per line).
 _STDERR_PATTERNS = {
@@ -53,15 +52,21 @@ TIMING_FIELDS = [
 HISTOGRAM_FIELDS = ["dataset", "cycle_size", "num_of_cycles"]
 
 
-def discover_datasets(dataset_dir: Path) -> list[Path]:
-    """Return dataset edge-list files sorted by ascending file size."""
-    files = sorted(dataset_dir.rglob("*.edges"), key=lambda p: p.stat().st_size)
-    return files
+def discover_datasets(dataset_dir: Path) -> List[Path]:
+    """Return dataset graph files sorted by ascending file size.
+
+    Both raw edge lists (.edges) and Matrix Market graphs (.mtx) are accepted;
+    the CLI parser auto-detects each format.
+    """
+    files = []  # type: List[Path]
+    for pattern in ("*.edges", "*.mtx"):
+        files.extend(dataset_dir.rglob(pattern))
+    return sorted(set(files), key=lambda p: p.stat().st_size)
 
 
-def parse_histogram(stdout: str) -> list[tuple[str, str]]:
+def parse_histogram(stdout: str) -> List[Tuple[str, str]]:
     """Parse the CLI histogram CSV into (cycle_size, num_of_cycles) rows."""
-    rows: list[tuple[str, str]] = []
+    rows = []  # type: List[Tuple[str, str]]
     for line in stdout.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -72,7 +77,8 @@ def parse_histogram(stdout: str) -> list[tuple[str, str]]:
     return rows
 
 
-def run_dataset(cli: str, dataset: Path, args) -> dict:
+def run_dataset(cli, dataset, args):
+    # type: (str, Path, argparse.Namespace) -> Dict
     """Run the CUDA counter on one dataset and return parsed results."""
     cmd = [
         cli,
@@ -85,7 +91,8 @@ def run_dataset(cli: str, dataset: Path, args) -> dict:
         "--max-cycle-length", str(args.max_cycle_length),
         "--report-timing",
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
 
     result = {field: "" for field in TIMING_FIELDS}
     result["dataset"] = dataset.stem
