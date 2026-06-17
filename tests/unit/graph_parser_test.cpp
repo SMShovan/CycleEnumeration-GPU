@@ -87,20 +87,100 @@ TEST(GraphParserTest, ThrowsForMissingFile) {
 }
 
 TEST(GraphParserTest, ThrowsForMalformedRows) {
-  const std::filesystem::path path =
-      std::filesystem::temp_directory_path() / "cycle_enum_bad_graph.txt";
+  const std::filesystem::path single_field_path =
+      std::filesystem::temp_directory_path() / "cycle_enum_single_field.txt";
   {
-    std::ofstream output(path);
-    output << "1 2\n";
+    std::ofstream output(single_field_path);
+    output << "5\n";
   }
-
   EXPECT_THROW(
       {
         const cycle_enum::TemporalGraph graph =
-            cycle_enum::read_temporal_graph(path);
+            cycle_enum::read_temporal_graph(single_field_path);
         (void)graph;
       },
       cycle_enum::GraphParseError);
+  std::filesystem::remove(single_field_path);
+
+  const std::filesystem::path extra_field_path =
+      std::filesystem::temp_directory_path() / "cycle_enum_extra_field.txt";
+  {
+    std::ofstream output(extra_field_path);
+    output << "1 2 3 4\n";
+  }
+  EXPECT_THROW(
+      {
+        const cycle_enum::TemporalGraph graph =
+            cycle_enum::read_temporal_graph(extra_field_path);
+        (void)graph;
+      },
+      cycle_enum::GraphParseError);
+  std::filesystem::remove(extra_field_path);
+
+  const std::filesystem::path bad_timestamp_path =
+      std::filesystem::temp_directory_path() / "cycle_enum_bad_timestamp.txt";
+  {
+    std::ofstream output(bad_timestamp_path);
+    output << "1 2 notanumber\n";
+  }
+  EXPECT_THROW(
+      {
+        const cycle_enum::TemporalGraph graph =
+            cycle_enum::read_temporal_graph(bad_timestamp_path);
+        (void)graph;
+      },
+      cycle_enum::GraphParseError);
+  std::filesystem::remove(bad_timestamp_path);
+}
+
+TEST(GraphParserTest, DefaultsTimestampWhenColumnOmitted) {
+  const std::filesystem::path path =
+      std::filesystem::temp_directory_path() / "cycle_enum_no_timestamp.txt";
+  {
+    std::ofstream output(path);
+    output << "1 2\n";
+    output << "2 1\n";
+  }
+
+  const cycle_enum::TemporalGraph graph =
+      cycle_enum::read_temporal_graph(path);
+
+  ASSERT_EQ(graph.vertex_count(), 2U);
+  ASSERT_TRUE(graph.compact_id(1).has_value());
+  ASSERT_TRUE(graph.compact_id(2).has_value());
+
+  const cycle_enum::TemporalEdge* edge =
+      graph.find_edge(*graph.compact_id(1), *graph.compact_id(2));
+  ASSERT_NE(edge, nullptr);
+  EXPECT_EQ(edge->timestamps, (std::vector<cycle_enum::Timestamp>{0}));
+
+  std::filesystem::remove(path);
+}
+
+TEST(GraphParserTest, ParsesCommaSeparatedRowsWithAndWithoutTimestamp) {
+  const std::filesystem::path path =
+      std::filesystem::temp_directory_path() / "cycle_enum_comma.txt";
+  {
+    std::ofstream output(path);
+    output << "% directed unweighted\n";
+    output << "1,2,7\n";
+    output << "2,1\n";
+  }
+
+  const cycle_enum::TemporalGraph graph =
+      cycle_enum::read_temporal_graph(path);
+
+  ASSERT_EQ(graph.vertex_count(), 2U);
+
+  const cycle_enum::TemporalEdge* edge_1_2 =
+      graph.find_edge(*graph.compact_id(1), *graph.compact_id(2));
+  ASSERT_NE(edge_1_2, nullptr);
+  EXPECT_EQ(edge_1_2->timestamps, (std::vector<cycle_enum::Timestamp>{7}));
+
+  const cycle_enum::TemporalEdge* edge_2_1 =
+      graph.find_edge(*graph.compact_id(2), *graph.compact_id(1));
+  ASSERT_NE(edge_2_1, nullptr);
+  EXPECT_EQ(edge_2_1->timestamps, (std::vector<cycle_enum::Timestamp>{0}));
 
   std::filesystem::remove(path);
 }

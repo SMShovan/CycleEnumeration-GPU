@@ -47,6 +47,84 @@ void check_cuda(const cudaError_t error, const char* operation) {
   }
 }
 
+// RAII owner of the CUDA events used to time a counting run. Tying event
+// creation and destruction to object lifetime prevents leaks if an exception is
+// thrown between record() calls. When disabled (no timing requested), every
+// method is a no-op so the timed and untimed paths share one code path.
+class ScopedCudaTimers {
+ public:
+  explicit ScopedCudaTimers(const bool enabled) : enabled_(enabled) {
+    if (!enabled_) {
+      return;
+    }
+    create(total_start);
+    create(total_stop);
+    create(upload_start);
+    create(upload_stop);
+    create(kernel_start);
+    create(kernel_stop);
+    create(download_start);
+    create(download_stop);
+  }
+
+  ScopedCudaTimers(const ScopedCudaTimers&) = delete;
+  ScopedCudaTimers& operator=(const ScopedCudaTimers&) = delete;
+  ScopedCudaTimers(ScopedCudaTimers&&) = delete;
+  ScopedCudaTimers& operator=(ScopedCudaTimers&&) = delete;
+
+  ~ScopedCudaTimers() {
+    destroy(total_start);
+    destroy(total_stop);
+    destroy(upload_start);
+    destroy(upload_stop);
+    destroy(kernel_start);
+    destroy(kernel_stop);
+    destroy(download_start);
+    destroy(download_stop);
+  }
+
+  void record(cudaEvent_t event) const {
+    if (enabled_) {
+      check_cuda(cudaEventRecord(event), "cudaEventRecord");
+    }
+  }
+
+  void fill(CudaTimingsMs& out) const {
+    check_cuda(cudaEventSynchronize(total_stop), "cudaEventSynchronize");
+    const float upload = elapsed(upload_start, upload_stop);
+    const float download = elapsed(download_start, download_stop);
+    out.kernel_ms = elapsed(kernel_start, kernel_stop);
+    out.memcpy_ms = upload + download;
+    out.total_ms = elapsed(total_start, total_stop);
+  }
+
+  cudaEvent_t total_start = nullptr;
+  cudaEvent_t total_stop = nullptr;
+  cudaEvent_t upload_start = nullptr;
+  cudaEvent_t upload_stop = nullptr;
+  cudaEvent_t kernel_start = nullptr;
+  cudaEvent_t kernel_stop = nullptr;
+  cudaEvent_t download_start = nullptr;
+  cudaEvent_t download_stop = nullptr;
+
+ private:
+  static void create(cudaEvent_t& event) {
+    check_cuda(cudaEventCreate(&event), "cudaEventCreate");
+  }
+  static void destroy(cudaEvent_t event) {
+    if (event != nullptr) {
+      (void)cudaEventDestroy(event);
+    }
+  }
+  static float elapsed(cudaEvent_t start, cudaEvent_t stop) {
+    float ms = 0.0F;
+    check_cuda(cudaEventElapsedTime(&ms, start, stop), "cudaEventElapsedTime");
+    return ms;
+  }
+
+  bool enabled_ = false;
+};
+
 template <typename T>
 class DeviceBuffer {
  public:
@@ -601,7 +679,8 @@ CycleHistogram count_simple_cycles_johnson_device(
 CycleHistogram count_simple_cycles_johnson_queue_device(
     const CudaGraphData& graph,
     const int device_id,
-    const std::size_t max_cycle_length) {
+    const std::size_t max_cycle_length,
+    CudaTimingsMs* const timings) {
   if (graph.vertex_count == 0 || graph.edge_count == 0) {
     return CycleHistogram{};
   }
@@ -624,7 +703,14 @@ CycleHistogram count_simple_cycles_johnson_queue_device(
     return CycleHistogram{};
   }
 
+  // Optional device-side timing. Events are recorded on the default stream so
+  // each window is ordered with the transfers and kernel it brackets.
+  ScopedCudaTimers timers(timings != nullptr);
+  timers.record(timers.total_start);
+  timers.record(timers.upload_start);
   DeviceGraph device = upload_graph(graph, /*with_timestamps=*/false);
+  timers.record(timers.upload_stop);
+
   DeviceBuffer<unsigned long long> histogram(max_cycle_length + 1);
   DeviceBuffer<unsigned long long> work_counter(1);
 
@@ -646,6 +732,7 @@ CycleHistogram count_simple_cycles_johnson_queue_device(
 
   const DeviceGraphView device_graph = device.view();
   const std::size_t shared_bytes = shared_histogram_bytes(max_cycle_length);
+  timers.record(timers.kernel_start);
   {
     const ScopedRange kernel_range("cuda_static_queue_kernel");
     count_roots_queue_kernel<<<launch.grid_blocks, launch.block_size,
@@ -655,11 +742,18 @@ CycleHistogram count_simple_cycles_johnson_queue_device(
     check_cuda(cudaGetLastError(), "count_roots_queue_kernel launch");
     check_cuda(cudaDeviceSynchronize(), "count_roots_queue_kernel synchronize");
   }
+  timers.record(timers.kernel_stop);
 
   std::vector<unsigned long long> host_histogram(max_cycle_length + 1, 0);
+  timers.record(timers.download_start);
   {
     const ScopedRange reduction_range("cuda_static_queue_reduction");
     histogram.copy_to_host(host_histogram, "copy histogram");
+  }
+  timers.record(timers.download_stop);
+  timers.record(timers.total_stop);
+  if (timings != nullptr) {
+    timers.fill(*timings);
   }
 
   CycleHistogram result;

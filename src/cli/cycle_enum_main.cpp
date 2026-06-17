@@ -53,6 +53,7 @@ struct CliConfig {
   Task task = Task::Count;
   cycle_enum::dynamic::BatchParams batch_params;
   bool compare_recompute = false;
+  bool report_timing = false;
   bool show_help = false;
   bool show_version = false;
 };
@@ -72,6 +73,7 @@ void print_usage(std::ostream& out) {
       << "  --deletes <count>  --inserts <count>  (update task)\n"
       << "  --batch-seed <integer>  --batch-locality <window>  (update task)\n"
       << "  --compare-recompute  (update task: verify against full recompute)\n"
+      << "  --report-timing  (cuda count: print kernel/memcpy/total ms to stderr)\n"
       << "  --help\n"
       << "  --version\n";
 }
@@ -391,6 +393,11 @@ template <typename Integer>
       continue;
     }
 
+    if (option == "--report-timing") {
+      config.report_timing = true;
+      continue;
+    }
+
     if (option == "--time-window" || option == "--window") {
       const auto value = next_value(args, index, option, err);
       if (!value.has_value()) {
@@ -555,13 +562,14 @@ template <typename Integer>
 [[nodiscard]] cycle_enum::CycleHistogram run_cuda(
     const cycle_enum::GraphView& graph,
     const cycle_enum::CycleEnumerationOptions& options,
-    const CudaScheduler scheduler) {
+    const CudaScheduler scheduler,
+    cycle_enum::cuda::CudaTimingsMs* const timings = nullptr) {
   if (options.mode == cycle_enum::CycleMode::Simple &&
       options.algorithm == cycle_enum::AlgorithmFamily::Johnson &&
       options.max_cycle_length.has_value()) {
     if (scheduler == CudaScheduler::WorkQueue) {
       return cycle_enum::cuda::count_simple_cycles_johnson_work_queue(
-          graph, options.cuda_device_id, *options.max_cycle_length);
+          graph, options.cuda_device_id, *options.max_cycle_length, timings);
     }
     return cycle_enum::cuda::count_simple_cycles_johnson(
         graph, options.cuda_device_id, *options.max_cycle_length);
@@ -587,14 +595,15 @@ template <typename Integer>
 [[nodiscard]] cycle_enum::CycleHistogram run_backend(
     const cycle_enum::GraphView& graph,
     const cycle_enum::CycleEnumerationOptions& options,
-    const CudaScheduler scheduler) {
+    const CudaScheduler scheduler,
+    cycle_enum::cuda::CudaTimingsMs* const timings = nullptr) {
   switch (options.execution) {
     case cycle_enum::ExecutionPolicy::Sequential:
       return run_sequential(graph, options);
     case cycle_enum::ExecutionPolicy::OpenMP:
       return run_openmp(graph, options);
     case cycle_enum::ExecutionPolicy::Cuda:
-      return run_cuda(graph, options, scheduler);
+      return run_cuda(graph, options, scheduler, timings);
   }
 
   throw std::logic_error("unsupported execution backend");
@@ -685,10 +694,26 @@ int main(int argc, char** argv) {
     const cycle_enum::TemporalGraph parsed =
         cycle_enum::read_temporal_graph(config->input_path);
     const cycle_enum::GraphView view = cycle_enum::build_graph_view(parsed);
+
+    cycle_enum::cuda::CudaTimingsMs timings;
+    const bool collect_timing =
+        config->report_timing && config->task == Task::Count &&
+        config->options.execution == cycle_enum::ExecutionPolicy::Cuda;
+
     const cycle_enum::CycleHistogram histogram =
         config->task == Task::Update
             ? run_update(view, *config, std::cerr)
-            : run_backend(view, config->options, config->cuda_scheduler);
+            : run_backend(view, config->options, config->cuda_scheduler,
+                          collect_timing ? &timings : nullptr);
+
+    if (collect_timing) {
+      std::cerr << "vertices: " << view.vertex_count() << '\n'
+                << "edges: " << view.edge_count() << '\n'
+                << "kernel_ms: " << timings.kernel_ms << '\n'
+                << "memcpy_ms: " << timings.memcpy_ms << '\n'
+                << "total_ms: " << timings.total_ms << '\n';
+    }
+
     std::cout << histogram.to_csv();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';

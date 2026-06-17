@@ -84,7 +84,8 @@ namespace detail {
 [[nodiscard]] CycleHistogram count_simple_cycles_johnson_queue_device(
     const CudaGraphData& graph,
     int device_id,
-    std::size_t max_cycle_length);
+    std::size_t max_cycle_length,
+    CudaTimingsMs* timings);
 
 }  // namespace detail
 #endif
@@ -92,7 +93,8 @@ namespace detail {
 CycleHistogram count_simple_cycles_johnson_work_queue(
     const GraphView& graph,
     const int device_id,
-    const std::size_t max_cycle_length) {
+    const std::size_t max_cycle_length,
+    CudaTimingsMs* const timings) {
   if (max_cycle_length < 2) {
     throw std::invalid_argument("max_cycle_length must be at least 2");
   }
@@ -100,10 +102,11 @@ CycleHistogram count_simple_cycles_johnson_work_queue(
 #if CYCLE_ENUM_CUDA_ENABLED
   require_device(device_id);
   return detail::count_simple_cycles_johnson_queue_device(
-      pack_graph_for_cuda(graph), device_id, max_cycle_length);
+      pack_graph_for_cuda(graph), device_id, max_cycle_length, timings);
 #else
   (void)graph;
   (void)device_id;
+  (void)timings;
   throw std::runtime_error("CUDA support is not compiled into this build");
 #endif
 }

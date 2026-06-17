@@ -33,6 +33,13 @@ struct RawTemporalEdge {
   Timestamp timestamp = 0;
 };
 
+// Timestamp assigned when an input row omits the timestamp column. Network
+// repository graph dumps are frequently static `source target` edge lists with
+// no timestamp; assigning a constant keeps the parser usable for static
+// (Simple) counting, which ignores timestamps. It is intentionally not a
+// meaningful time and must not be relied on for temporal modes.
+constexpr Timestamp kDefaultMissingTimestamp = 0;
+
 }  // namespace
 
 GraphParseError::GraphParseError(const std::string& message)
@@ -107,17 +114,35 @@ TemporalGraph read_temporal_graph(const std::filesystem::path& path) {
       continue;
     }
 
+    // Accept comma-separated dumps by normalizing separators to whitespace so
+    // raw network-repository files parse without manual preprocessing.
+    std::replace(line.begin(), line.end(), ',', ' ');
+
     std::istringstream row(line);
     ExternalVertexId source_external = 0;
     ExternalVertexId target_external = 0;
-    Timestamp timestamp = 0;
+    Timestamp timestamp = kDefaultMissingTimestamp;
     std::string trailing;
 
-    if (!(row >> source_external >> target_external >> timestamp) ||
-        (row >> trailing)) {
-      throw GraphParseError(
-          line_error(path, line_number,
-                     "expected exactly three fields: source target timestamp"));
+    if (!(row >> source_external >> target_external)) {
+      throw GraphParseError(line_error(
+          path, line_number,
+          "expected at least two fields: source target [timestamp]"));
+    }
+
+    // The timestamp column is optional. A present third field must be an
+    // integer timestamp; anything left over after it is a malformed row.
+    if (!(row >> timestamp)) {
+      row.clear();
+      if (row >> trailing) {
+        throw GraphParseError(line_error(
+            path, line_number, "third field is not an integer timestamp"));
+      }
+      timestamp = kDefaultMissingTimestamp;
+    } else if (row >> trailing) {
+      throw GraphParseError(line_error(
+          path, line_number,
+          "expected at most three fields: source target timestamp"));
     }
 
     if (source_external == target_external) {

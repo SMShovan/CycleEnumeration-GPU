@@ -13,6 +13,22 @@
 namespace cycle_enum::cuda {
 
 /**
+ * @brief Device-side timing breakdown for a single CUDA counting run.
+ *
+ * All values are milliseconds measured with CUDA events on the device. They are
+ * only populated by entry points that accept a `CudaTimingsMs*`; a null pointer
+ * disables timing. `memcpy_ms` covers the host-to-device graph upload plus the
+ * device-to-host histogram copy; `kernel_ms` is the counting kernel alone;
+ * `total_ms` spans the whole device-side routine (upload, allocation, kernel,
+ * and download).
+ */
+struct CudaTimingsMs {
+  float kernel_ms = 0.0F; ///< Counting-kernel execution time.
+  float memcpy_ms = 0.0F; ///< Host/device transfer time (upload + download).
+  float total_ms = 0.0F;  ///< End-to-end device-side time.
+};
+
+/**
  * @brief A persistent-kernel launch configuration.
  */
 struct WorkQueueLaunch {
@@ -79,6 +95,8 @@ struct WorkQueueTuning {
  * @param graph CSR/CSC graph view.
  * @param device_id CUDA device ordinal.
  * @param max_cycle_length Maximum cycle length to count; must be at least 2.
+ * @param timings Optional output for the device-side timing breakdown; when
+ *   non-null it is filled with kernel, transfer, and total milliseconds.
  * @return Histogram keyed by cycle length.
  *
  * @throws std::invalid_argument if `max_cycle_length` is less than 2.
@@ -88,6 +106,7 @@ struct WorkQueueTuning {
 [[nodiscard]] CycleHistogram count_simple_cycles_johnson_work_queue(
     const GraphView& graph,
     int device_id,
-    std::size_t max_cycle_length);
+    std::size_t max_cycle_length,
+    CudaTimingsMs* timings = nullptr);
 
 }  // namespace cycle_enum::cuda

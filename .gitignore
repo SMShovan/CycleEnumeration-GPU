@@ -53,3 +53,9 @@ benchmarks/results/*
 benchmarks/data/*
 !benchmarks/data/README.md
 
+# Downloaded network-repository datasets (not redistributed; see paper for sources)
+dataset/
+
+# Benchmark run outputs (timestamped per run; never committed)
+results/
+
