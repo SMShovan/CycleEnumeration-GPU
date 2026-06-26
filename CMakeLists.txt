@@ -244,6 +244,8 @@ if(CYCLE_ENUM_CUDA_AVAILABLE)
   target_sources(cycle_enum_cuda
     PRIVATE
       src/cuda/cuda_johnson_kernel.cu
+      src/cuda/cuda_johnson_blocked_kernel.cu
+      src/cuda/cuda_johnson_rank_kernel.cu
   )
   target_link_libraries(cycle_enum_cuda PUBLIC CUDA::cudart)
   set_target_properties(cycle_enum_cuda

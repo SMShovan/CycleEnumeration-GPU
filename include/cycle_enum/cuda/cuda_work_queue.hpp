@@ -4,6 +4,8 @@
 #include "cycle_enum/core/histogram.hpp"
 
 #include <cstddef>
+#include <cstdint>
+#include <vector>
 
 /**
  * @file cuda_work_queue.hpp
@@ -26,6 +28,21 @@ struct CudaTimingsMs {
   float kernel_ms = 0.0F; ///< Counting-kernel execution time.
   float memcpy_ms = 0.0F; ///< Host/device transfer time (upload + download).
   float total_ms = 0.0F;  ///< End-to-end device-side time.
+};
+
+/**
+ * @brief Per-root certainty report for the blocking backend.
+ *
+ * The blocking counter never overcounts, so its histogram is a lower bound. A
+ * root is flagged when its bounded search hit the length cap on an otherwise
+ * eligible descent (or overflowed a per-thread capacity), meaning its cycles may
+ * be undercounted. Unflagged roots are exact, so `flagged_count == 0` certifies
+ * the histogram equals the exact (non-blocking) result.
+ */
+struct UncertaintyReport {
+  std::uint64_t flagged_count = 0; ///< Roots that may be undercounted.
+  std::uint64_t total_roots = 0;   ///< Roots processed.
+  std::vector<VertexId> flagged;   ///< Ids of flagged roots (optional detail).
 };
 
 /**
@@ -107,6 +124,25 @@ struct WorkQueueTuning {
     const GraphView& graph,
     int device_id,
     std::size_t max_cycle_length,
-    CudaTimingsMs* timings = nullptr);
+    CudaTimingsMs* timings = nullptr,
+    bool blocking = false,
+    UncertaintyReport* report = nullptr);
+
+/**
+ * @brief Count static simple cycles with the rank-based depth-aware blocking
+ * backend (the proposed method).
+ *
+ * Exact for all cycles up to `max_cycle_length` when `step_budget == 0`. When
+ * `step_budget > 0`, any root whose search exceeds the budget is stopped and
+ * flagged, so the histogram becomes a certified lower bound and `report` (if
+ * provided) lists the flagged roots.
+ */
+[[nodiscard]] CycleHistogram count_simple_cycles_johnson_rank(
+    const GraphView& graph,
+    int device_id,
+    std::size_t max_cycle_length,
+    CudaTimingsMs* timings = nullptr,
+    std::uint64_t step_budget = 0,
+    UncertaintyReport* report = nullptr);
 
 }  // namespace cycle_enum::cuda

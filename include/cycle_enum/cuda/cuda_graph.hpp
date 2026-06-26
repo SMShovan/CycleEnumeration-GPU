@@ -55,6 +55,13 @@ struct CudaGraphData {
   std::vector<VertexId> outgoing_neighbors; ///< SoA target vertex per edge slot.
   std::vector<DeviceOffset> outgoing_timestamp_begin; ///< SoA inclusive offset.
   std::vector<DeviceOffset> outgoing_timestamp_end; ///< SoA exclusive offset.
+
+  // CSC cross-reference used by the blocking backend. `incoming_neighbors[k]` is
+  // the source vertex of the k-th CSC in-edge slot, and `incoming_csr_index[k]`
+  // is the CSR out-edge slot of that same directed edge, so the kernel can read
+  // the B bit (indexed by CSR slot) for each predecessor during unblock.
+  std::vector<VertexId> incoming_neighbors; ///< SoA source per CSC in-edge slot.
+  std::vector<DeviceOffset> incoming_csr_index; ///< CSR slot per CSC in-edge slot.
 };
 
 /**

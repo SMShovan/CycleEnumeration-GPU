@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -41,6 +42,12 @@ namespace {
 // path; naive stays available for debugging and parity checks.
 enum class CudaScheduler { Naive, WorkQueue };
 
+// Which CUDA blocking backend to use on the static simple-cycle work-queue path.
+// None: existing non-blocking exact kernel. Certify: lower-bound plus cap-hit
+// certificate. Rank: proposed depth-aware rank blocking (exact unless a per-root
+// step budget is set).
+enum class BlockingMode { None, Certify, Rank };
+
 // Whether to recompute a histogram from scratch or incrementally update a prior
 // one under a generated batch of edge changes.
 enum class Task { Count, Update };
@@ -54,6 +61,9 @@ struct CliConfig {
   cycle_enum::dynamic::BatchParams batch_params;
   bool compare_recompute = false;
   bool report_timing = false;
+  BlockingMode blocking_mode = BlockingMode::None;
+  std::uint64_t step_budget = 0;
+  std::optional<std::filesystem::path> report_uncertain_path;
   bool show_help = false;
   bool show_version = false;
 };
@@ -74,6 +84,9 @@ void print_usage(std::ostream& out) {
       << "  --batch-seed <integer>  --batch-locality <window>  (update task)\n"
       << "  --compare-recompute  (update task: verify against full recompute)\n"
       << "  --report-timing  (cuda count: print kernel/memcpy/total ms to stderr)\n"
+      << "  --blocking <none|certify|rank>  (cuda simple work-queue blocking backend)\n"
+      << "  --step-budget <N>  (rank blocking: per-root work cap; 0 = off, exact)\n"
+      << "  --report-uncertain <path>  (blocking: write flagged root ids)\n"
       << "  --help\n"
       << "  --version\n";
 }
@@ -97,6 +110,20 @@ void print_usage(std::ostream& out) {
   if (value == "work-queue" || value == "work_queue" || value == "workqueue" ||
       value == "queue") {
     return CudaScheduler::WorkQueue;
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<BlockingMode> parse_blocking_mode(
+    const std::string_view value) noexcept {
+  if (value == "none" || value == "no" || value == "off" || value == "0") {
+    return BlockingMode::None;
+  }
+  if (value == "certify" || value == "yes" || value == "on" || value == "1") {
+    return BlockingMode::Certify;
+  }
+  if (value == "rank") {
+    return BlockingMode::Rank;
   }
   return std::nullopt;
 }
@@ -398,6 +425,43 @@ template <typename Integer>
       continue;
     }
 
+    if (option == "--blocking") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto mode = parse_blocking_mode(*value);
+      if (!mode.has_value()) {
+        err << "--blocking expects none, certify, or rank\n";
+        return std::nullopt;
+      }
+      config.blocking_mode = *mode;
+      continue;
+    }
+
+    if (option == "--step-budget") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      const auto parsed = parse_integer<std::uint64_t>(*value, option, err);
+      if (!parsed.has_value()) {
+        return std::nullopt;
+      }
+      config.step_budget = *parsed;
+      continue;
+    }
+
+    if (option == "--report-uncertain") {
+      const auto value = next_value(args, index, option, err);
+      if (!value.has_value()) {
+        return std::nullopt;
+      }
+      config.report_uncertain_path =
+          std::filesystem::path(std::string(*value));
+      continue;
+    }
+
     if (option == "--time-window" || option == "--window") {
       const auto value = next_value(args, index, option, err);
       if (!value.has_value()) {
@@ -449,6 +513,36 @@ template <typename Integer>
     for (const std::string& error : cli_errors) {
       err << error << '\n';
     }
+    return std::nullopt;
+  }
+
+  if (config.blocking_mode != BlockingMode::None) {
+    std::vector<std::string> blocking_errors;
+    if (config.options.execution != cycle_enum::ExecutionPolicy::Cuda) {
+      blocking_errors.emplace_back("--blocking requires --backend cuda");
+    }
+    if (config.options.algorithm != cycle_enum::AlgorithmFamily::Johnson) {
+      blocking_errors.emplace_back("--blocking requires --algorithm johnson");
+    }
+    if (config.options.mode != cycle_enum::CycleMode::Simple) {
+      blocking_errors.emplace_back("--blocking requires --mode simple");
+    }
+    if (config.cuda_scheduler != CudaScheduler::WorkQueue) {
+      blocking_errors.emplace_back(
+          "--blocking requires --cuda-scheduler work-queue");
+    }
+    if (config.task != Task::Count) {
+      blocking_errors.emplace_back("--blocking is only valid for --task count");
+    }
+    if (!blocking_errors.empty()) {
+      for (const std::string& error : blocking_errors) {
+        err << error << '\n';
+      }
+      return std::nullopt;
+    }
+  }
+  if (config.step_budget > 0 && config.blocking_mode != BlockingMode::Rank) {
+    err << "--step-budget requires --blocking rank\n";
     return std::nullopt;
   }
 
@@ -563,13 +657,22 @@ template <typename Integer>
     const cycle_enum::GraphView& graph,
     const cycle_enum::CycleEnumerationOptions& options,
     const CudaScheduler scheduler,
-    cycle_enum::cuda::CudaTimingsMs* const timings = nullptr) {
+    cycle_enum::cuda::CudaTimingsMs* const timings = nullptr,
+    const BlockingMode blocking_mode = BlockingMode::None,
+    const std::uint64_t step_budget = 0,
+    cycle_enum::cuda::UncertaintyReport* const report = nullptr) {
   if (options.mode == cycle_enum::CycleMode::Simple &&
       options.algorithm == cycle_enum::AlgorithmFamily::Johnson &&
       options.max_cycle_length.has_value()) {
     if (scheduler == CudaScheduler::WorkQueue) {
+      if (blocking_mode == BlockingMode::Rank) {
+        return cycle_enum::cuda::count_simple_cycles_johnson_rank(
+            graph, options.cuda_device_id, *options.max_cycle_length, timings,
+            step_budget, report);
+      }
       return cycle_enum::cuda::count_simple_cycles_johnson_work_queue(
-          graph, options.cuda_device_id, *options.max_cycle_length, timings);
+          graph, options.cuda_device_id, *options.max_cycle_length, timings,
+          blocking_mode == BlockingMode::Certify, report);
     }
     return cycle_enum::cuda::count_simple_cycles_johnson(
         graph, options.cuda_device_id, *options.max_cycle_length);
@@ -596,14 +699,18 @@ template <typename Integer>
     const cycle_enum::GraphView& graph,
     const cycle_enum::CycleEnumerationOptions& options,
     const CudaScheduler scheduler,
-    cycle_enum::cuda::CudaTimingsMs* const timings = nullptr) {
+    cycle_enum::cuda::CudaTimingsMs* const timings = nullptr,
+    const BlockingMode blocking_mode = BlockingMode::None,
+    const std::uint64_t step_budget = 0,
+    cycle_enum::cuda::UncertaintyReport* const report = nullptr) {
   switch (options.execution) {
     case cycle_enum::ExecutionPolicy::Sequential:
       return run_sequential(graph, options);
     case cycle_enum::ExecutionPolicy::OpenMP:
       return run_openmp(graph, options);
     case cycle_enum::ExecutionPolicy::Cuda:
-      return run_cuda(graph, options, scheduler, timings);
+      return run_cuda(graph, options, scheduler, timings, blocking_mode,
+                      step_budget, report);
   }
 
   throw std::logic_error("unsupported execution backend");
@@ -700,11 +807,20 @@ int main(int argc, char** argv) {
         config->report_timing && config->task == Task::Count &&
         config->options.execution == cycle_enum::ExecutionPolicy::Cuda;
 
+    cycle_enum::cuda::UncertaintyReport uncertainty;
+    const bool use_blocking =
+        config->blocking_mode != BlockingMode::None &&
+        config->task == Task::Count;
+
     const cycle_enum::CycleHistogram histogram =
         config->task == Task::Update
             ? run_update(view, *config, std::cerr)
             : run_backend(view, config->options, config->cuda_scheduler,
-                          collect_timing ? &timings : nullptr);
+                          collect_timing ? &timings : nullptr,
+                          config->task == Task::Count ? config->blocking_mode
+                                                      : BlockingMode::None,
+                          config->step_budget,
+                          use_blocking ? &uncertainty : nullptr);
 
     if (collect_timing) {
       std::cerr << "vertices: " << view.vertex_count() << '\n'
@@ -715,6 +831,32 @@ int main(int argc, char** argv) {
     }
 
     std::cout << histogram.to_csv();
+
+    if (use_blocking) {
+      const char* const reason =
+          config->blocking_mode == BlockingMode::Rank ? "the step budget"
+                                                      : "the length cap";
+      if (uncertainty.flagged_count == 0) {
+        std::cout << "# status: exact (0 of " << uncertainty.total_roots
+                  << " roots hit " << reason << ")\n";
+      } else {
+        std::cout << "# status: lower-bound (" << uncertainty.flagged_count
+                  << " of " << uncertainty.total_roots << " roots hit " << reason
+                  << ")\n";
+      }
+      std::cerr << "flagged_roots: " << uncertainty.flagged_count << '\n';
+      if (config->report_uncertain_path.has_value()) {
+        std::ofstream out(*config->report_uncertain_path);
+        if (!out) {
+          std::cerr << "could not open --report-uncertain file: "
+                    << config->report_uncertain_path->string() << '\n';
+        } else {
+          for (const cycle_enum::VertexId vertex : uncertainty.flagged) {
+            out << vertex << '\n';
+          }
+        }
+      }
+    }
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

@@ -4,9 +4,11 @@
 #include "cycle_enum/cuda/cuda_graph.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 /**
  * @file cuda_work_queue.cpp
@@ -87,6 +89,23 @@ namespace detail {
     std::size_t max_cycle_length,
     CudaTimingsMs* timings);
 
+[[nodiscard]] CycleHistogram count_simple_cycles_johnson_blocked_queue_device(
+    const CudaGraphData& graph,
+    int device_id,
+    std::size_t max_cycle_length,
+    CudaTimingsMs* timings,
+    std::vector<unsigned char>* uncertain_out,
+    std::uint64_t* flagged_out);
+
+[[nodiscard]] CycleHistogram count_simple_cycles_johnson_rank_queue_device(
+    const CudaGraphData& graph,
+    int device_id,
+    std::size_t max_cycle_length,
+    CudaTimingsMs* timings,
+    std::uint64_t step_budget,
+    std::vector<unsigned char>* uncertain_out,
+    std::uint64_t* flagged_out);
+
 }  // namespace detail
 #endif
 
@@ -94,19 +113,82 @@ CycleHistogram count_simple_cycles_johnson_work_queue(
     const GraphView& graph,
     const int device_id,
     const std::size_t max_cycle_length,
-    CudaTimingsMs* const timings) {
+    CudaTimingsMs* const timings,
+    const bool blocking,
+    UncertaintyReport* const report) {
   if (max_cycle_length < 2) {
     throw std::invalid_argument("max_cycle_length must be at least 2");
   }
 
 #if CYCLE_ENUM_CUDA_ENABLED
   require_device(device_id);
+  if (blocking) {
+    std::vector<unsigned char> uncertain;
+    std::uint64_t flagged = 0;
+    CycleHistogram histogram =
+        detail::count_simple_cycles_johnson_blocked_queue_device(
+            pack_graph_for_cuda(graph), device_id, max_cycle_length, timings,
+            &uncertain, &flagged);
+    if (report != nullptr) {
+      report->flagged_count = flagged;
+      report->total_roots = static_cast<std::uint64_t>(graph.vertex_count());
+      report->flagged.clear();
+      for (std::size_t vertex = 0; vertex < uncertain.size(); ++vertex) {
+        if (uncertain[vertex] != 0) {
+          report->flagged.push_back(static_cast<VertexId>(vertex));
+        }
+      }
+    }
+    return histogram;
+  }
   return detail::count_simple_cycles_johnson_queue_device(
       pack_graph_for_cuda(graph), device_id, max_cycle_length, timings);
 #else
   (void)graph;
   (void)device_id;
   (void)timings;
+  (void)blocking;
+  (void)report;
+  throw std::runtime_error("CUDA support is not compiled into this build");
+#endif
+}
+
+CycleHistogram count_simple_cycles_johnson_rank(
+    const GraphView& graph,
+    const int device_id,
+    const std::size_t max_cycle_length,
+    CudaTimingsMs* const timings,
+    const std::uint64_t step_budget,
+    UncertaintyReport* const report) {
+  if (max_cycle_length < 2) {
+    throw std::invalid_argument("max_cycle_length must be at least 2");
+  }
+
+#if CYCLE_ENUM_CUDA_ENABLED
+  require_device(device_id);
+  std::vector<unsigned char> uncertain;
+  std::uint64_t flagged = 0;
+  CycleHistogram histogram =
+      detail::count_simple_cycles_johnson_rank_queue_device(
+          pack_graph_for_cuda(graph), device_id, max_cycle_length, timings,
+          step_budget, &uncertain, &flagged);
+  if (report != nullptr) {
+    report->flagged_count = flagged;
+    report->total_roots = static_cast<std::uint64_t>(graph.vertex_count());
+    report->flagged.clear();
+    for (std::size_t vertex = 0; vertex < uncertain.size(); ++vertex) {
+      if (uncertain[vertex] != 0) {
+        report->flagged.push_back(static_cast<VertexId>(vertex));
+      }
+    }
+  }
+  return histogram;
+#else
+  (void)graph;
+  (void)device_id;
+  (void)timings;
+  (void)step_budget;
+  (void)report;
   throw std::runtime_error("CUDA support is not compiled into this build");
 #endif
 }

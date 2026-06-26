@@ -75,3 +75,33 @@ TEST(CudaGraphTest, PacksEmptyGraph) {
   EXPECT_TRUE(packed.incoming_edges.empty());
   EXPECT_TRUE(packed.timestamps.empty());
 }
+
+TEST(CudaGraphTest, BuildsCscToCsrCrossMapForBlocking) {
+  const cycle_enum::GraphView view = cycle_enum::build_graph_view(sample_graph());
+  const cycle_enum::cuda::CudaGraphData packed =
+      cycle_enum::cuda::pack_graph_for_cuda(view);
+
+  ASSERT_EQ(packed.incoming_neighbors.size(), packed.incoming_edges.size());
+  ASSERT_EQ(packed.incoming_csr_index.size(), packed.incoming_edges.size());
+
+  // For every CSC in-edge slot k owned by target w, the cross map must point to
+  // the CSR out-edge slot of the same directed edge (source -> w): matching
+  // source, target, and edge id, and the CSR slot must lie in the source's
+  // outgoing segment. This is what the blocking kernel relies on during unblock.
+  for (std::size_t w = 0; w + 1 < packed.incoming_offsets.size(); ++w) {
+    for (cycle_enum::cuda::DeviceOffset k = packed.incoming_offsets[w];
+         k < packed.incoming_offsets[w + 1]; ++k) {
+      const cycle_enum::VertexId source = packed.incoming_neighbors[k];
+      EXPECT_EQ(source, packed.incoming_edges[k].vertex);
+
+      const cycle_enum::cuda::DeviceOffset csr = packed.incoming_csr_index[k];
+      ASSERT_LT(csr, packed.outgoing_edges.size());
+      EXPECT_EQ(packed.outgoing_neighbors[csr],
+                static_cast<cycle_enum::VertexId>(w));
+      EXPECT_EQ(packed.outgoing_edges[csr].edge_id,
+                packed.incoming_edges[k].edge_id);
+      EXPECT_GE(csr, packed.outgoing_offsets[source]);
+      EXPECT_LT(csr, packed.outgoing_offsets[source + 1]);
+    }
+  }
+}

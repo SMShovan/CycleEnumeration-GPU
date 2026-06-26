@@ -1,5 +1,7 @@
 #include "cycle_enum/cuda/cuda_graph.hpp"
 
+#include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <stdexcept>
 
@@ -59,6 +61,8 @@ CudaGraphData pack_graph_for_cuda(const GraphView& graph) {
       {},
       {},
       {},
+      {},
+      {},
   };
 
   // Split the hot outgoing adjacency into a structure-of-arrays layout for
@@ -74,6 +78,30 @@ CudaGraphData pack_graph_for_cuda(const GraphView& graph) {
         checked_offset(entry.timestamp_begin));
     packed.outgoing_timestamp_end.push_back(
         checked_offset(entry.timestamp_end));
+  }
+
+  // Cross-map for the blocking backend: for each CSC in-edge slot, store the
+  // source vertex (SoA) and the CSR out-edge slot of the same directed edge so
+  // the kernel can read B bits (indexed by CSR slot) during unblock.
+  const std::vector<AdjacencyEntry>& incoming = graph.incoming_edges();
+  std::uint64_t max_edge_id = 0;
+  for (const AdjacencyEntry& entry : outgoing) {
+    max_edge_id = std::max<std::uint64_t>(
+        max_edge_id, static_cast<std::uint64_t>(entry.edge_id));
+  }
+  std::vector<DeviceOffset> csr_slot_of_edge(
+      outgoing.empty() ? 0 : static_cast<std::size_t>(max_edge_id) + 1,
+      std::numeric_limits<DeviceOffset>::max());
+  for (std::size_t slot = 0; slot < outgoing.size(); ++slot) {
+    csr_slot_of_edge[static_cast<std::size_t>(outgoing[slot].edge_id)] =
+        checked_offset(slot);
+  }
+  packed.incoming_neighbors.reserve(incoming.size());
+  packed.incoming_csr_index.reserve(incoming.size());
+  for (const AdjacencyEntry& entry : incoming) {
+    packed.incoming_neighbors.push_back(entry.vertex);
+    packed.incoming_csr_index.push_back(
+        csr_slot_of_edge[static_cast<std::size_t>(entry.edge_id)]);
   }
 
   return packed;
